@@ -1,0 +1,5 @@
+ALTER TABLE academic_records ADD COLUMN programa TEXT NOT NULL DEFAULT '';
+ALTER TABLE academic_records ADD COLUMN cod_asig TEXT NOT NULL DEFAULT '';
+ALTER TABLE academic_records ADD COLUMN digito TEXT NOT NULL DEFAULT '';
+ALTER TABLE academic_records ADD COLUMN nro TEXT NOT NULL DEFAULT '';
+

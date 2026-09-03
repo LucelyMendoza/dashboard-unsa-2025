@@ -1,0 +1,41 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "dashboard-unsa",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-07-31",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "dashboard-unsa"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "NEXT_INC_CACHE_R2_BUCKET",
+			"bucket_name": "dashboard-unsa-opennext-cache"
+		}
+	],
+	"images": {
+		"binding": "IMAGES"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "academic-db-local",
+			"database_id": "e8b1cf9a-c79d-43a5-938e-9e1195baa24f"
+		},
+		{
+			"binding": "DB_REMOTE",
+			"database_name": "academic-db",
+			"database_id": "0c8731bc-675d-4865-a106-7c942eda7322"
+		}
+	]
+}
