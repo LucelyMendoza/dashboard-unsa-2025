@@ -13,6 +13,11 @@ interface ImportSummary {
   errores: { fila: number; motivo: string }[];
 }
 
+interface PreviewResponse {
+  summary: ImportSummary;
+  preview: ImportRow[];
+}
+
 type ModalStep = 'idle' | 'reading' | 'preview' | 'confirming' | 'done' | 'error';
 
 export default function AdminUploadModal() {
@@ -85,7 +90,7 @@ export default function AdminUploadModal() {
         throw new Error(await readError(previewRes, `Error en el servidor (${previewRes.status}).`));
       }
 
-      const { summary: s, preview: p } = await previewRes.json();
+      const { summary: s, preview: p } = (await previewRes.json()) as PreviewResponse;
       setSummary(s);
       setPreview(p || []);
       setAllRows(result.filasValidas);

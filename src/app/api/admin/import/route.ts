@@ -2,8 +2,6 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { requireAdmin, AuthError } from '@/lib/auth-verify';
 import type { ImportRow } from '@/lib/excelParser';
 
-export const runtime = 'edge';
-
 interface ImportBody {
   rows: ImportRow[];
   sourceFile: string;
@@ -16,6 +14,11 @@ interface Summary {
   duplicados: number;
   errores: { fila: number; motivo: string }[];
 }
+
+type AppEnv = CloudflareEnv & {
+  DB?: D1Database;
+  DB_REMOTE?: D1Database;
+};
 
 const BATCH_SIZE = 50; // filas por sentencia D1.batch()
 
@@ -48,8 +51,9 @@ export async function POST(request: Request) {
   }
 
   const { env } = getCloudflareContext();
-  const db = env.DB as D1Database;
-  const remoteDb = (env.DB_REMOTE as D1Database | undefined) ?? undefined;
+  const appEnv = env as AppEnv;
+  const db = appEnv.DB;
+  const remoteDb = appEnv.DB_REMOTE;
   if (!db) {
     return Response.json({ error: 'La base de datos D1 (binding DB) no está configurada en este entorno.' }, { status: 500 });
   }

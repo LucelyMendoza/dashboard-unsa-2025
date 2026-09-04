@@ -77,7 +77,7 @@ export default function DashboardPage() {
     fetch('/api/dataset')
       .then((res) => {
         if (!res.ok) throw new Error(`API error ${res.status}`);
-        return res.json();
+        return res.json() as Promise<DashboardDataset>;
       })
       .then((data: DashboardDataset) => setDataset(data)) // Ya viene computado desde la API
       .catch((err) => {

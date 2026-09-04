@@ -2,8 +2,6 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { buildDataset } from '@/lib/dataset-builder';
 import type { ImportRow } from '@/lib/excelParser';
 
-export const runtime = 'edge';
-
 interface DbRow {
   periodo: string;
   anio: number;
@@ -25,6 +23,8 @@ interface DbRow {
   promedio: number;
 }
 
+type AppEnv = CloudflareEnv & { DB?: D1Database };
+
 /**
  * GET público (requiere sesión válida, verificada igual que en login — no
  * expone nada por rol acá; el filtrado por facultad/escuela del DECANO/
@@ -33,7 +33,7 @@ interface DbRow {
  */
 export async function GET() {
   const { env } = getCloudflareContext();
-  const db = env.DB as D1Database;
+  const db = (env as AppEnv).DB;
   if (!db) {
     return Response.json({ error: 'La base de datos D1 (binding DB) no está configurada en este entorno.' }, { status: 500 });
   }
@@ -46,7 +46,13 @@ export async function GET() {
     )
     .all<DbRow>();
 
-  const rows: ImportRow[] = (res.results ?? []).map((r, i) => ({ ...r, _fila: i }));
+  const rows: ImportRow[] = (res.results ?? []).map((r, i) => ({
+    ...r,
+    codAsig: r.cod_asig ?? r.codigo,
+    digito: r.digito ?? '',
+    nro: r.nro ?? '',
+    _fila: i,
+  }));
   const dataset = buildDataset(rows);
   return Response.json(dataset);
 }
