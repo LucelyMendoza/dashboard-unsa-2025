@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { parseExcelFile, ExcelParseError } from '@/lib/excelParser';
+import { getImportRowKey, groupImportRows } from '@/lib/import-utils';
 import { getIdToken } from '@/lib/firebase';
 import type { ImportRow } from '@/lib/excelParser';
 
@@ -30,6 +31,13 @@ interface ValidationError {
 }
 
 type ModalStep = 'idle' | 'reading' | 'preview' | 'confirming' | 'done' | 'error';
+const API_BATCH_SIZE = 1000;
+
+function splitIntoBatches<T>(items: T[], size: number) {
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += size) batches.push(items.slice(i, i + size));
+  return batches;
+}
 
 export default function AdminUploadModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -40,8 +48,11 @@ export default function AdminUploadModal() {
   const [allRows, setAllRows] = useState<ImportRow[]>([]);
   const [duplicateGroups, setDuplicateGroups] = useState<PreviewResponse['duplicateGroups']>([]);
   const [duplicateSelections, setDuplicateSelections] = useState<Record<string, number | ''>>({});
+  const [existingKeys, setExistingKeys] = useState<string[]>([]);
+  const [replaceExisting, setReplaceExisting] = useState(false);
   const [sourceFile, setSourceFile] = useState('');
   const [showErrors, setShowErrors] = useState(false);
+  const [progress, setProgress] = useState('');
 
   const readError = async (res: Response, fallback: string) => {
     const text = await res.text();
@@ -49,7 +60,10 @@ export default function AdminUploadModal() {
       const data = JSON.parse(text);
       return data.error || fallback;
     } catch {
-      return text || fallback;
+      if (text.includes('Worker exceeded resource limits') || text.includes('error-code">1102')) {
+        return 'Cloudflare agotó los recursos al procesar este lote. Si ocurrió al guardar, puede que parte del lote actual ya se haya importado; revisa los datos antes de reintentar.';
+      }
+      return text.slice(0, 500) || fallback;
     }
   };
 
@@ -61,8 +75,11 @@ export default function AdminUploadModal() {
     setAllRows([]);
     setDuplicateGroups([]);
     setDuplicateSelections({});
+    setExistingKeys([]);
+    setReplaceExisting(false);
     setSourceFile('');
     setShowErrors(false);
+    setProgress('');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,38 +99,74 @@ export default function AdminUploadModal() {
         throw new Error(`Archivo con solo errores de validación. ${result.errores.length} filas rechazadas.`);
       }
 
-      // Enviar al backend para preview y dedup
+      // Analiza en lotes pequeños para que los archivos grandes no excedan los límites del Worker.
       const token = await getIdToken();
       if (!token) throw new Error('No hay sesión activa. Por favor, vuelve a iniciar sesión.');
 
-      const previewRes = await fetch('/api/admin/import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          rows: result.filasValidas,
-          validationErrors: result.errores,
-          sourceFile: file.name,
-          mode: 'preview',
-        }),
-      });
+      const groups = groupImportRows(result.filasValidas);
+      const entries = Array.from(groups.entries());
+      const batches = splitIntoBatches(entries, API_BATCH_SIZE);
+      const existingKeys = new Set<string>();
+      const serverPreviews: ImportRow[] = [];
 
-      if (!previewRes.ok) {
-        throw new Error(await readError(previewRes, `Error en el servidor (${previewRes.status}).`));
+      for (let i = 0; i < batches.length; i += 1) {
+        setProgress(`Revisando lote ${i + 1} de ${batches.length}...`);
+        const previewRes = await fetch('/api/admin/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            rows: batches[i].map(([, group]) => group[0]),
+            sourceFile: file.name,
+            mode: 'preview',
+          }),
+        });
+
+        if (!previewRes.ok) {
+          throw new Error(await readError(previewRes, `Error en el servidor (${previewRes.status}).`));
+        }
+
+        const response = (await previewRes.json()) as PreviewResponse;
+        response.duplicateGroups.forEach((group) => existingKeys.add(group.key));
+        const remainingPreviewSlots = 50 - serverPreviews.length;
+        if (remainingPreviewSlots > 0) serverPreviews.push(...response.preview.slice(0, remainingPreviewSlots));
       }
 
-      const { summary: s, preview: p, duplicateGroups: duplicates } = (await previewRes.json()) as PreviewResponse;
-      setSummary(s);
-      setPreview(p || []);
+      const duplicates = entries
+        .filter(([, group]) => group.length > 1)
+        .map(([key, group]) => ({
+          key,
+          exists: existingKeys.has(key),
+          rowNumbers: group.map((row) => row._fila),
+          rows: group,
+        }));
+      const duplicateKeys = new Set(duplicates.map((group) => group.key));
+      const newGroups = entries.filter(([key]) => !duplicateKeys.has(key) && !existingKeys.has(key)).length;
+      const duplicateRows = entries.reduce(
+        (count, [key, group]) => count + (duplicateKeys.has(key) || existingKeys.has(key) ? group.length : 0),
+        0
+      );
+
+      setSummary({
+        totalFilas: result.filasValidas.length,
+        nuevos: newGroups,
+        duplicados: duplicateRows,
+        errores: result.errores,
+      });
+      setPreview(serverPreviews.filter((row) => !duplicateKeys.has(getImportRowKey(row))));
       setAllRows(result.filasValidas);
-      setDuplicateGroups(duplicates || []);
+      setDuplicateGroups(duplicates);
       setDuplicateSelections({});
+      setExistingKeys(Array.from(existingKeys));
+      setReplaceExisting(false);
+      setProgress('');
       setStep('preview');
     } catch (e) {
       const msg = e instanceof ExcelParseError ? e.message : e instanceof Error ? e.message : 'Error desconocido al leer el archivo.';
       setError(msg);
+      setProgress('');
       setStep('error');
     }
   };
@@ -127,33 +180,75 @@ export default function AdminUploadModal() {
       const token = await getIdToken();
       if (!token) throw new Error('No hay sesión activa. Por favor, vuelve a iniciar sesión.');
 
-      const commitRes = await fetch('/api/admin/import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          rows: allRows,
-          sourceFile,
-          mode: 'commit',
-          validationErrors: summary.errores,
-          duplicateSelections: Object.fromEntries(
-            Object.entries(duplicateSelections).filter((entry): entry is [string, number] => typeof entry[1] === 'number')
-          ),
-        }),
-      });
+      const groups = groupImportRows(allRows);
+      const duplicateKeys = new Set(duplicateGroups.map((group) => group.key));
+      const existingKeySet = new Set(existingKeys);
+      const rowsToCommit: ImportRow[] = [];
+      const selectionsToCommit: Record<string, number> = {};
 
-      if (!commitRes.ok) {
-        throw new Error(await readError(commitRes, `Error en el servidor (${commitRes.status}).`));
+      for (const [key, group] of groups) {
+        const isDuplicate = duplicateKeys.has(key) || existingKeySet.has(key);
+        if (!isDuplicate) {
+          rowsToCommit.push(group[0]);
+          continue;
+        }
+
+        const selectedRowNumber = duplicateSelections[key];
+        const selectedRow =
+          typeof selectedRowNumber === 'number'
+            ? group.find((row) => row._fila === selectedRowNumber)
+            : replaceExisting && existingKeySet.has(key)
+              ? group[0]
+              : undefined;
+        if (!selectedRow) continue;
+        rowsToCommit.push(selectedRow);
+        if (existingKeySet.has(key)) selectionsToCommit[key] = selectedRow._fila;
       }
 
-      const result = (await commitRes.json()) as { summary: ImportSummary };
-      setSummary(result.summary);
+      const batches = splitIntoBatches(rowsToCommit, API_BATCH_SIZE);
+      let savedRows = 0;
+      for (let i = 0; i < batches.length; i += 1) {
+        setProgress(`Guardando lote ${i + 1} de ${batches.length}...`);
+        const batch = batches[i];
+        const batchSelections: Record<string, number> = {};
+        for (const row of batch) {
+          const key = getImportRowKey(row);
+          if (selectionsToCommit[key] !== undefined) batchSelections[key] = selectionsToCommit[key];
+        }
+        const commitRes = await fetch('/api/admin/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            rows: batch,
+            sourceFile,
+            mode: 'commit',
+            duplicateSelections: batchSelections,
+          }),
+        });
+
+        if (!commitRes.ok) {
+          const reason = await readError(commitRes, `Error en el servidor (${commitRes.status}).`);
+          throw new Error(
+            savedRows
+              ? `La importación se interrumpió en el lote ${i + 1} de ${batches.length}. Ya se guardaron ${savedRows} registros. ${reason} Revisa los duplicados antes de reintentar.`
+              : reason
+          );
+        }
+
+        const result = (await commitRes.json()) as { summary: ImportSummary };
+        savedRows += result.summary.nuevos;
+      }
+
+      setSummary({ ...summary, nuevos: savedRows });
+      setProgress('');
       setStep('done');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error desconocido al confirmar.';
       setError(msg);
+      setProgress('');
       setStep('error');
     }
   };
@@ -225,7 +320,7 @@ export default function AdminUploadModal() {
                 <div className="inline-block">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent)]" />
                 </div>
-                <p className="mt-3 text-xs text-slate-600">Procesando archivo...</p>
+                <p className="mt-3 text-xs text-slate-600">{progress || 'Procesando archivo...'}</p>
               </div>
             )}
 
@@ -283,7 +378,7 @@ export default function AdminUploadModal() {
                     <div>
                       <p className="text-xs font-semibold text-orange-900">Revisar grupos duplicados</p>
                       <p className="text-[10px] text-orange-800">
-                        Por seguridad no se importan automáticamente. Elige una fila para reemplazar el registro existente o para conservar solo esa fila del Excel. Déjalo en «Omitir» para no importar ese grupo.
+                        Elige una fila para conservar en cada grupo repetido dentro del archivo. Déjalo en «Omitir» para no importar ese grupo.
                       </p>
                     </div>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -295,7 +390,7 @@ export default function AdminUploadModal() {
                               {first.periodo} · {first.facultad} · {first.escuela} · {first.codigo} · Grupo {first.grupo || '—'}
                             </span>
                             <span className="block text-[10px] text-slate-500">
-                              {group.exists ? 'Ya existe en la base de datos.' : 'La clave se repite en el archivo.'}
+                              {group.exists ? 'La clave se repite en el archivo y ya existe en la base de datos.' : 'La clave se repite en el archivo.'}
                             </span>
                             <select
                               value={duplicateSelections[group.key] ?? ''}
@@ -319,6 +414,25 @@ export default function AdminUploadModal() {
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {existingKeys.length > 0 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold text-amber-900">
+                      {existingKeys.length} registros del archivo ya existen en D1
+                    </p>
+                    <label className="mt-2 flex items-start gap-2 text-[10px] text-amber-900">
+                      <input
+                        type="checkbox"
+                        checked={replaceExisting}
+                        onChange={(event) => setReplaceExisting(event.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        Reemplazar los registros existentes con los datos del archivo. Si hay varias filas del archivo para la misma clave, se usará la primera.
+                      </span>
+                    </label>
                   </div>
                 )}
 
@@ -367,7 +481,7 @@ export default function AdminUploadModal() {
                   </button>
                   <button
                     onClick={handleConfirm}
-                    disabled={summary.nuevos === 0 && !Object.values(duplicateSelections).some((rowNumber) => typeof rowNumber === 'number')}
+                    disabled={summary.nuevos === 0 && !replaceExisting && !Object.values(duplicateSelections).some((rowNumber) => typeof rowNumber === 'number')}
                     className="px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 rounded-md"
                   >
                     Confirmar importación
@@ -382,7 +496,7 @@ export default function AdminUploadModal() {
                 <div className="inline-block">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent)]" />
                 </div>
-                <p className="mt-3 text-xs text-slate-600">Guardando en la base de datos...</p>
+                <p className="mt-3 text-xs text-slate-600">{progress || 'Guardando en la base de datos...'}</p>
               </div>
             )}
 

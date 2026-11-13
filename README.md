@@ -40,9 +40,15 @@ por separado como desglose y no se vuelven a sumar a `APROBADOS`. `AÑO ESTUDIOS
 también se conserva en D1 para consultas futuras.
 
 La clave para detectar duplicados es `PERIODO + FACULTAD + ESCUELA + CODIGO +
-GRUPOS`. Las filas nuevas se importan automáticamente; para cada clave duplicada
-puedes elegir una fila del archivo para reemplazar/conservar, o dejar el grupo
-omitido. Así no se duplican accidentalmente los conteos del tablero.
+GRUPOS`. El archivo se analiza y guarda en lotes para evitar exceder los límites
+de recursos de Cloudflare. Las filas nuevas se importan automáticamente; para
+claves repetidas dentro del archivo puedes elegir una fila o dejar el grupo
+omitido. Si una clave ya existe en D1, puedes reemplazar los registros existentes
+marcando la opción correspondiente en la vista previa.
+
+Si una importación se interrumpe mientras guarda, algunos lotes podrían haberse
+guardado ya. Vuelve a cargar el mismo archivo y, en la vista previa, elige si
+quieres reemplazar las claves que ya aparecen en D1 antes de continuar.
 
 La importación se guarda en la base D1 configurada para el entorno en ejecución.
 En local, la base empieza vacía; al importar desde `localhost`, los datos solo

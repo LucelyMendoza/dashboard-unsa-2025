@@ -1,5 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { requireAdmin, AuthError } from '@/lib/auth-verify';
+import { getImportRowKey, groupImportRows } from '@/lib/import-utils';
 import type { ImportRow } from '@/lib/excelParser';
 
 interface ImportBody {
@@ -30,39 +31,43 @@ type AppEnv = CloudflareEnv & {
 
 const BATCH_SIZE = 50; // filas por sentencia D1.batch()
 
-function rowKey(r: Pick<ImportRow, 'periodo' | 'facultad' | 'escuela' | 'codigo' | 'grupo'>) {
-  return JSON.stringify([r.periodo, r.facultad, r.escuela, r.codigo, r.grupo]);
-}
-
 async function findExistingKeys(db: D1Database, rows: ImportRow[]) {
-  const periodos = Array.from(new Set(rows.map((r) => r.periodo)));
-  if (!periodos.length) return new Set<string>();
+  const rowsByKey = new Map<string, ImportRow>();
+  for (const row of rows) rowsByKey.set(getImportRowKey(row), row);
+  const uniqueRows = Array.from(rowsByKey.values());
+  if (!uniqueRows.length) return new Set<string>();
 
-  const placeholders = periodos.map(() => '?').join(',');
+  const keysJson = JSON.stringify(uniqueRows.map((row) => [
+    row.periodo,
+    row.facultad,
+    row.escuela,
+    row.codigo,
+    row.grupo,
+  ]));
   const result = await db
     .prepare(
-      `SELECT periodo, facultad, escuela, codigo, grupo
-       FROM academic_records WHERE periodo IN (${placeholders})`
+      `WITH import_keys AS (
+         SELECT
+           json_extract(value, '$[0]') AS periodo,
+           json_extract(value, '$[1]') AS facultad,
+           json_extract(value, '$[2]') AS escuela,
+           json_extract(value, '$[3]') AS codigo,
+           json_extract(value, '$[4]') AS grupo
+         FROM json_each(?)
+       )
+       SELECT academic_records.periodo, academic_records.facultad, academic_records.escuela,
+              academic_records.codigo, academic_records.grupo
+       FROM academic_records
+       INNER JOIN import_keys USING (periodo, facultad, escuela, codigo, grupo)`
     )
-    .bind(...periodos)
+    .bind(keysJson)
     .all<Pick<ImportRow, 'periodo' | 'facultad' | 'escuela' | 'codigo' | 'grupo'>>();
 
-  return new Set((result.results ?? []).map(rowKey));
-}
-
-function groupByKey(rows: ImportRow[]) {
-  const groups = new Map<string, ImportRow[]>();
-  for (const row of rows) {
-    const key = rowKey(row);
-    const group = groups.get(key);
-    if (group) group.push(row);
-    else groups.set(key, [row]);
-  }
-  return groups;
+  return new Set((result.results ?? []).map(getImportRowKey));
 }
 
 function getDuplicateGroups(rows: ImportRow[], existingKeys: Set<string>): DuplicateGroup[] {
-  return Array.from(groupByKey(rows), ([key, group]) => ({
+  return Array.from(groupImportRows(rows), ([key, group]) => ({
     key,
     exists: existingKeys.has(key),
     rowNumbers: group.map((row) => row._fila),
@@ -102,7 +107,7 @@ export async function POST(request: Request) {
   }
 
   const existingKeys = await findExistingKeys(db, rows);
-  const groups = groupByKey(rows);
+  const groups = groupImportRows(rows);
   const duplicateGroups = getDuplicateGroups(rows, existingKeys);
   const duplicateGroupKeys = new Set(duplicateGroups.map((group) => group.key));
   const duplicateSelections = body.duplicateSelections ?? {};
