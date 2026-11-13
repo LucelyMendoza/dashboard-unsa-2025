@@ -1,12 +1,7 @@
 import * as XLSX from 'xlsx';
 import { facultadDeEscuela } from '@/lib/school-catalog';
 
-/**
- * Cabeceras reales de los archivos SISACAD (verificadas contra los Excel de
- * origen: no incluyen FACULTAD ni DOCENTE — solo ESCUELA; la facultad se
- * resuelve vía school-catalog.ts, y el docente por defecto es
- * '(sin especificar)' si la hoja no lo trae).
- */
+/** Cabeceras aceptadas del Excel SISACAD; FACULTAD y DOCENTE(S) son opcionales. */
 export interface RawExcelRow {
   PERIODO: string;
   ESCUELA: string;
@@ -18,9 +13,14 @@ export interface RawExcelRow {
   DESAPROBADOS: number;
   ABANDONOS?: number;
   RETIROS?: number;
+  'APROB 11-13'?: number;
+  'APROB. 14-16'?: number;
+  'APROB. 17-20'?: number;
   PROMEDIO?: number;
   DOCENTE?: string;
+  DOCENTES?: string;
   FACULTAD?: string; // opcional: si el Excel sí la trae (otras fuentes), se respeta
+  'AÑO ESTUDIOS'?: string | number;
 }
 
 // Mínimas para poder ubicar y agregar el registro. Todo lo demás es opcional
@@ -50,6 +50,9 @@ const HEADER_ALIASES: Record<string, string> = {
   'NO_CULMINADOS': 'ABANDONOS',
   'RETIROS': 'RETIROS',
   'RETIRADOS': 'RETIROS',
+  'APROB_11_13': 'APROB_11_13',
+  'APROB_14_16': 'APROB_14_16',
+  'APROB_17_20': 'APROB_17_20',
   'PROMEDIO': 'PROMEDIO',
   'NOTA_PROMEDIO': 'PROMEDIO',
   'DOCENTE': 'DOCENTE',
@@ -58,6 +61,8 @@ const HEADER_ALIASES: Record<string, string> = {
   'ESCUELA': 'ESCUELA',
   'PROGRAMA_DE_ESTUDIOS': 'PROGRAMA',
   'PERIODO': 'PERIODO',
+  'AÑO_ESTUDIOS': 'ANIO_ESTUDIOS',
+  'ANIO_ESTUDIOS': 'ANIO_ESTUDIOS',
 };
 
 const normalizeHeader = (h: string) =>
@@ -88,6 +93,10 @@ export interface ImportRow {
   desaprobados: number;
   abandonos: number;
   retiros: number;
+  aprob1113: number;
+  aprob1416: number;
+  aprob1720: number;
+  anioEstudios: string;
   promedio: number;
   // fila original (1-indexado incluyendo cabecera) para reportar errores
   _fila: number;
@@ -172,6 +181,10 @@ export function parseExcelFile(fileBuffer: ArrayBuffer): ParseResult {
       desaprobados: Number(norm.DESAPROBADOS || 0),
       abandonos: Number(norm.ABANDONOS || 0),
       retiros: Number(norm.RETIROS || 0),
+      aprob1113: Number(norm.APROB_11_13 || 0),
+      aprob1416: Number(norm.APROB_14_16 || 0),
+      aprob1720: Number(norm.APROB_17_20 || 0),
+      anioEstudios: String(norm.ANIO_ESTUDIOS ?? '').trim(),
       promedio: Number(norm.PROMEDIO || 0),
       _fila: fila,
     });

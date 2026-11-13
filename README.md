@@ -6,46 +6,49 @@ Dashboard de rendimiento académico de pregrado (2019–2024) con acceso por rol
 
 ```bash
 npm install
+npx wrangler d1 migrations apply academic-db-produccion --local
 npm run dev
 ```
 
 Abre `http://localhost:3000` → redirige a `/login`.
+La migración prepara una base D1 local vacía y no modifica la base de producción.
+Para ver datos en el dashboard, inicia sesión con una cuenta ADMIN y carga un Excel.
 
-## Cuentas de prueba (`src/lib/roles.ts`)
-
-| Correo | Rol | Alcance |
-|---|---|---|
-| `admin.programadora@unsa.edu.pe` | ADMIN | Todo + carga de Excel |
-| `vicerrector.academico@unsa.edu.pe` | VICERRECTOR | Todo (solo lectura) |
-| `decano.biologicas@unsa.edu.pe` | DECANO | Facultad de Cs. Biológicas (todas sus escuelas) |
-| `esiug@unsa.edu.pe` | DIRECTOR | Solo Ingeniería Pesquera |
-
-El login es solo por correo (sin contraseña) — es una simulación para desarrollo.
-Cuando se conecte el directorio institucional (SSO/LDAP/Google Workspace), el
-formulario de `src/app/login/page.tsx` se reemplaza por ese flujo, y
-`getUserByEmail` en `src/lib/roles.ts` se conecta a la fuente real de roles.
+El acceso se realiza con Google. Solo pueden entrar los correos autorizados en
+`src/lib/roles.ts`; la carga de datos está disponible únicamente para el rol
+`ADMIN`.
 
 ## Dar de alta una cuenta/rol nuevo
 
-Editar `src/lib/roles.ts` y agregar una entrada a `USER_ACCOUNTS`. Los nombres de
+Editar `src/lib/roles.ts` y agregar una entrada a `ROLE_MAP`. Los nombres de
 `facultad`/`escuela` deben coincidir EXACTAMENTE con los que aparecen en
 `public/data/initialData.json` (columnas `FACULTAD`/`ESCUELA` del Excel origen).
 
 ## Actualizar los datos (rol ADMIN)
 
-En el dashboard, botón **"Subir Excel / Actualizar"**. El Excel debe tener las
-columnas: `DOCENTE, FACULTAD, ESCUELA, PERIODO, ASIGNATURA, MATRICULADOS,
-APROBADOS, DESAPROBADOS, RETIRADOS, NO_CULMINADOS, NOTA_PROMEDIO`.
+Inicia sesión con un correo ADMIN y usa **"Subir Excel"** en la barra superior
+(en móvil, abre el menú **Menú** para encontrar el botón). El importador reconoce
+las cabeceras `PERIODO, FACULTAD, ESCUELA, CODIGO, ASIGNATURA, GRUPOS,
+MATRICULADOS, APROBADOS, DESAPROBADOS, ABANDONOS, RETIROS, APROB 11-13,
+APROB. 14-16, APROB. 17-20, PROMEDIO, DOCENTES` y `AÑO ESTUDIOS`.
+Son obligatorias `PERIODO, ESCUELA, CODIGO, ASIGNATURA, MATRICULADOS, APROBADOS`
+y `DESAPROBADOS`; las demás son opcionales.
 
-En el tablero, `RETIRADOS` y `NO_CULMINADOS` se muestran por separado como
-`Retiro` y `Abandono`, sin juntarlos bajo una sola etiqueta de “no culminación”.
+Los indicadores del tablero usan los totales `APROBADOS`, `DESAPROBADOS`,
+`ABANDONOS`, `RETIROS` y `MATRICULADOS`. Los tres rangos de aprobados se guardan
+por separado como desglose y no se vuelven a sumar a `APROBADOS`. `AÑO ESTUDIOS`
+también se conserva en D1 para consultas futuras.
 
-La carga solo actualiza la sesión actual (no hay backend que escriba en disco).
-Tras cargar, el modal ofrece **descargar el `initialData.json` actualizado** —
-reemplaza el archivo en `public/data/` y vuelve a desplegar para publicarlo
-para todos los roles. El siguiente paso natural es mover esto a un endpoint
-real (API Route + base de datos, o Cloudflare D1/KV) para que la carga se
-persista sola.
+La clave para detectar duplicados es `PERIODO + FACULTAD + ESCUELA + CODIGO +
+GRUPOS`. Las filas nuevas se importan automáticamente; para cada clave duplicada
+puedes elegir una fila del archivo para reemplazar/conservar, o dejar el grupo
+omitido. Así no se duplican accidentalmente los conteos del tablero.
+
+La importación se guarda en la base D1 configurada para el entorno en ejecución.
+En local, la base empieza vacía; al importar desde `localhost`, los datos solo
+se guardan en la D1 local y no alteran producción. Antes de desplegar una versión
+que incluya una migración nueva, aplícala también a producción con
+`npx wrangler d1 migrations apply academic-db-produccion --remote`.
 
 ## Estructura
 

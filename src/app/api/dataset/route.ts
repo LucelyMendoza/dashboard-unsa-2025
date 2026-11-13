@@ -20,6 +20,10 @@ interface DbRow {
   desaprobados: number;
   abandonos: number;
   retiros: number;
+  aprob_11_13?: number;
+  aprob_14_16?: number;
+  aprob_17_20?: number;
+  anio_estudios?: string;
   promedio: number;
 }
 
@@ -41,7 +45,8 @@ export async function GET() {
   const res = await db
     .prepare(
       `SELECT periodo, anio, facultad, escuela, COALESCE(programa, '') as programa, codigo, cod_asig, digito, nro, asignatura, grupo, docente,
-              matriculados, aprobados, desaprobados, abandonos, retiros, promedio
+              matriculados, aprobados, desaprobados, abandonos, retiros,
+              aprob_11_13, aprob_14_16, aprob_17_20, anio_estudios, promedio
        FROM academic_records`
     )
     .all<DbRow>();
@@ -51,6 +56,10 @@ export async function GET() {
     codAsig: r.cod_asig ?? r.codigo,
     digito: r.digito ?? '',
     nro: r.nro ?? '',
+    aprob1113: r.aprob_11_13 ?? 0,
+    aprob1416: r.aprob_14_16 ?? 0,
+    aprob1720: r.aprob_17_20 ?? 0,
+    anioEstudios: r.anio_estudios ?? '',
     _fila: i,
   }));
   const dataset = buildDataset(rows);

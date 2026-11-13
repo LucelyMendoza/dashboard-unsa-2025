@@ -20,14 +20,23 @@ export function buildDataset(rows: ImportRow[]): DashboardDataset {
   const dn: string[] = [];
   const sa: DashboardDataset['sa'] = [];
   const dc: DashboardDataset['dc'] = [];
+  const indexes = {
+    dn: new Map<string, number>(),
+    fs: new Map<string, number>(),
+    es: new Map<string, number>(),
+    pr: new Map<string, number>(),
+    ps: new Map<string, number>(),
+    an: new Map<string, number>(),
+  };
 
-  const getOrAdd = (list: string[], val: string) => {
+  const getOrAdd = (list: string[], index: Map<string, number>, val: string) => {
     const v = val?.trim() || '(sin especificar)';
-    let idx = list.indexOf(v);
-    if (idx === -1) {
-      list.push(v);
-      idx = list.length - 1;
-    }
+    const existing = index.get(v);
+    if (existing !== undefined) return existing;
+
+    const idx = list.length;
+    list.push(v);
+    index.set(v, idx);
     return idx;
   };
 
@@ -35,12 +44,12 @@ export function buildDataset(rows: ImportRow[]): DashboardDataset {
     const isGeneral = row.facultad === '(SIN CLASIFICAR)' || row.escuela.includes('GENERAL');
     if (isGeneral) return;
 
-    const idDoc = getOrAdd(dn, row.docente);
-    const idFac = getOrAdd(fs, row.facultad);
-    const idEsc = getOrAdd(es, row.escuela);
-    const idPro = getOrAdd(pr, row.programa);
-    const idPer = getOrAdd(ps, row.periodo);
-    const idAsi = getOrAdd(an, row.asignatura);
+    const idDoc = getOrAdd(dn, indexes.dn, row.docente);
+    const idFac = getOrAdd(fs, indexes.fs, row.facultad);
+    const idEsc = getOrAdd(es, indexes.es, row.escuela);
+    const idPro = getOrAdd(pr, indexes.pr, row.programa);
+    const idPer = getOrAdd(ps, indexes.ps, row.periodo);
+    const idAsi = getOrAdd(an, indexes.an, row.asignatura);
 
     if (!fe[row.facultad]) fe[row.facultad] = [];
     if (!fe[row.facultad].includes(row.escuela)) fe[row.facultad].push(row.escuela);

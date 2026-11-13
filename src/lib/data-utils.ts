@@ -46,12 +46,15 @@ export const DEFAULT_FILTERS: FilterState = {
 };
 
 /** Filtra las filas agregadas (ag) según facultad/escuela/año/periodo */
-export function filterAgg(ag: AggregatedRow[], f: FilterState): AggregatedRow[] {
+export function filterAgg(
+  ag: AggregatedRow[],
+  { facultad, escuela, anio, periodo }: Pick<FilterState, 'facultad' | 'escuela' | 'anio' | 'periodo'>
+): AggregatedRow[] {
   return ag.filter((r) => {
-    if (f.facultad !== 'ALL' && r.FACULTAD !== f.facultad) return false;
-    if (f.escuela !== 'ALL' && r.ESCUELA !== f.escuela) return false;
-    if (f.anio !== 'ALL' && String(r.AÑO) !== f.anio) return false;
-    if (f.periodo !== 'ALL' && r.PERIODO !== f.periodo) return false;
+    if (facultad !== 'ALL' && r.FACULTAD !== facultad) return false;
+    if (escuela !== 'ALL' && r.ESCUELA !== escuela) return false;
+    if (anio !== 'ALL' && String(r.AÑO) !== anio) return false;
+    if (periodo !== 'ALL' && r.PERIODO !== periodo) return false;
     return true;
   });
 }
@@ -83,21 +86,27 @@ export function groupBy(data: AggregatedRow[], keyFn: (r: AggregatedRow) => stri
 }
 
 /** Filtra el scorecard de escuelas (sc) según facultad/escuela seleccionadas */
-export function filterScorecard(sc: ScorecardRow[], f: FilterState): ScorecardRow[] {
+export function filterScorecard(sc: ScorecardRow[], facultad: string, escuela: string): ScorecardRow[] {
   let out = sc;
-  if (f.facultad !== 'ALL') out = out.filter((c) => c.f === f.facultad);
-  if (f.escuela !== 'ALL') out = out.filter((c) => c.e === f.escuela);
+  if (facultad !== 'ALL') out = out.filter((c) => c.f === facultad);
+  if (escuela !== 'ALL') out = out.filter((c) => c.e === escuela);
   return out;
 }
 
 /** Filtra filas crudas por asignatura (sa) usando los catálogos del dataset */
-export function filterSubjectRows(dataset: DashboardDataset, f: FilterState): SubjectRow[] {
+export function filterSubjectRows(
+  dataset: DashboardDataset,
+  facultad: string,
+  escuela: string,
+  anio: string,
+  periodo: string
+): SubjectRow[] {
   const { fs: F, es: E, ps: P } = dataset;
   return dataset.sa.filter((r) => {
-    if (f.facultad !== 'ALL' && F[r[1]] !== f.facultad) return false;
-    if (f.escuela !== 'ALL' && E[r[2]] !== f.escuela) return false;
-    if (f.anio !== 'ALL' && !P[r[0]].startsWith(f.anio)) return false;
-    if (f.periodo !== 'ALL' && P[r[0]] !== f.periodo) return false;
+    if (facultad !== 'ALL' && F[r[1]] !== facultad) return false;
+    if (escuela !== 'ALL' && E[r[2]] !== escuela) return false;
+    if (anio !== 'ALL' && !P[r[0]].startsWith(anio)) return false;
+    if (periodo !== 'ALL' && P[r[0]] !== periodo) return false;
     return true;
   });
 }

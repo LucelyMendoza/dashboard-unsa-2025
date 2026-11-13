@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { fmt, hmClass, rate } from '@/lib/data-utils';
 import type { DashboardDataset } from '@/types/dashboard';
 import type { FilterState } from '@/lib/data-utils';
@@ -22,13 +22,6 @@ const METRIC_LABELS: Record<MetricKey, string> = {
   abn: 'Abandono',
 };
 
-const METRIC_INDEX: Record<MetricKey, number> = {
-  apr: 5,
-  des: 6,
-  abn: 7,
-  ret: 8,
-};
-
 export default function SubjectHeatmap({
   dataset,
   filters,
@@ -38,35 +31,43 @@ export default function SubjectHeatmap({
   filters: FilterState;
   metric: MetricKey;
 }) {
-  const sa = filterSubjectRows(dataset, filters);
+  const sa = useMemo(
+    () => filterSubjectRows(dataset, filters.facultad, filters.escuela, filters.anio, filters.periodo),
+    [dataset, filters.facultad, filters.escuela, filters.anio, filters.periodo]
+  );
   const { an: AN, ps: P } = dataset;
-  const valueIdx = METRIC_INDEX[metric];
 
-  const byA: Record<string, Record<string, { m: number; v: number }>> = {};
-  sa.forEach((r) => {
-    const n = AN[r[3]];
-    const p = P[r[0]];
-    if (!byA[n]) byA[n] = {};
-    if (!byA[n][p]) byA[n][p] = { m: 0, v: 0 };
-    byA[n][p].m += r[4];
-    byA[n][p].v += r[valueIdx];
-  });
+  const byA = useMemo(() => {
+    const result: Record<string, Record<string, { m: number; apr: number; des: number; abn: number; ret: number }>> = {};
+    sa.forEach((r) => {
+      const n = AN[r[3]];
+      const p = P[r[0]];
+      if (!result[n]) result[n] = {};
+      if (!result[n][p]) result[n][p] = { m: 0, apr: 0, des: 0, abn: 0, ret: 0 };
+      result[n][p].m += r[5];
+      result[n][p].apr += r[6];
+      result[n][p].des += r[7];
+      result[n][p].abn += r[8];
+      result[n][p].ret += r[9];
+    });
+    return result;
+  }, [sa, AN, P]);
 
   const periodList =
     filters.periodo !== 'ALL' ? [filters.periodo] : filters.anio !== 'ALL' ? P.filter((p) => p.startsWith(filters.anio)) : P;
 
-  const aggList = Object.keys(byA)
+  const aggList = useMemo(() => Object.keys(byA)
     .map((n) => {
       let tm = 0;
       let tv = 0;
-      Object.values(byA[n]).forEach((v) => {
-        tm += v.m;
-        tv += v.v;
+      Object.values(byA[n]).forEach((values) => {
+        tm += values.m;
+        tv += values[metric];
       });
       return { n, rate: rate(tv, tm), t: tm };
     })
     .filter((a) => a.t >= 30)
-    .sort((a, b) => a.rate - b.rate);
+    .sort((a, b) => a.rate - b.rate), [byA, metric]);
 
   const shown = aggList.length > 60 ? [...aggList.slice(0, 30), { n: '···', sep: true, rate: 0, t: 0 }, ...aggList.slice(-30)] : aggList;
 
@@ -106,9 +107,9 @@ export default function SubjectHeatmap({
                 {periodList.map((p) => {
                   const d = byA[a.n]?.[p];
                   if (!d) return <td key={p} className="text-right px-2 py-1 text-slate-300">—</td>;
-                  const v = rate(d.v, d.m);
+                  const v = rate(d[metric], d.m);
                   return (
-                    <td key={p} className="text-right px-2 py-1" style={{ background: HEAT_BG[hmClass(v)] }} title={`${d.v}/${d.m}`}>
+                    <td key={p} className="text-right px-2 py-1" style={{ background: HEAT_BG[hmClass(v)] }} title={`${d[metric]}/${d.m}`}>
                       {v.toFixed(0)}%
                     </td>
                   );

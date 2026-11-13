@@ -10,12 +10,23 @@ interface ImportSummary {
   totalFilas: number;
   nuevos: number;
   duplicados: number;
-  errores: { fila: number; motivo: string }[];
+  errores: ValidationError[];
 }
 
 interface PreviewResponse {
   summary: ImportSummary;
   preview: ImportRow[];
+  duplicateGroups: {
+    key: string;
+    exists: boolean;
+    rowNumbers: number[];
+    rows: ImportRow[];
+  }[];
+}
+
+interface ValidationError {
+  fila: number;
+  motivo: string;
 }
 
 type ModalStep = 'idle' | 'reading' | 'preview' | 'confirming' | 'done' | 'error';
@@ -27,9 +38,10 @@ export default function AdminUploadModal() {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [preview, setPreview] = useState<ImportRow[]>([]);
   const [allRows, setAllRows] = useState<ImportRow[]>([]);
+  const [duplicateGroups, setDuplicateGroups] = useState<PreviewResponse['duplicateGroups']>([]);
+  const [duplicateSelections, setDuplicateSelections] = useState<Record<string, number | ''>>({});
   const [sourceFile, setSourceFile] = useState('');
   const [showErrors, setShowErrors] = useState(false);
-  const [replaceDuplicates, setReplaceDuplicates] = useState(false);
 
   const readError = async (res: Response, fallback: string) => {
     const text = await res.text();
@@ -47,9 +59,10 @@ export default function AdminUploadModal() {
     setSummary(null);
     setPreview([]);
     setAllRows([]);
+    setDuplicateGroups([]);
+    setDuplicateSelections({});
     setSourceFile('');
     setShowErrors(false);
-    setReplaceDuplicates(false);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +94,7 @@ export default function AdminUploadModal() {
         },
         body: JSON.stringify({
           rows: result.filasValidas,
+          validationErrors: result.errores,
           sourceFile: file.name,
           mode: 'preview',
         }),
@@ -90,10 +104,12 @@ export default function AdminUploadModal() {
         throw new Error(await readError(previewRes, `Error en el servidor (${previewRes.status}).`));
       }
 
-      const { summary: s, preview: p } = (await previewRes.json()) as PreviewResponse;
+      const { summary: s, preview: p, duplicateGroups: duplicates } = (await previewRes.json()) as PreviewResponse;
       setSummary(s);
       setPreview(p || []);
       setAllRows(result.filasValidas);
+      setDuplicateGroups(duplicates || []);
+      setDuplicateSelections({});
       setStep('preview');
     } catch (e) {
       const msg = e instanceof ExcelParseError ? e.message : e instanceof Error ? e.message : 'Error desconocido al leer el archivo.';
@@ -120,7 +136,11 @@ export default function AdminUploadModal() {
         body: JSON.stringify({
           rows: allRows,
           sourceFile,
-          mode: replaceDuplicates ? 'replace' : 'commit',
+          mode: 'commit',
+          validationErrors: summary.errores,
+          duplicateSelections: Object.fromEntries(
+            Object.entries(duplicateSelections).filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+          ),
         }),
       });
 
@@ -128,6 +148,8 @@ export default function AdminUploadModal() {
         throw new Error(await readError(commitRes, `Error en el servidor (${commitRes.status}).`));
       }
 
+      const result = (await commitRes.json()) as { summary: ImportSummary };
+      setSummary(result.summary);
       setStep('done');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error desconocido al confirmar.';
@@ -173,11 +195,12 @@ export default function AdminUploadModal() {
             {step === 'idle' && (
               <div className="space-y-4">
                 <p className="text-xs text-slate-600">
-                  Carga un archivo Excel (.xlsx) con datos académicos. Las columnas requeridas son:
+                  Carga un archivo Excel (.xlsx, .xls o .csv). Se reconocen estas cabeceras:
                   <br />
                   <code className="bg-slate-100 p-1.5 rounded font-mono text-[10px] block mt-1.5">
-                    PERIODO | ESCUELA | CODIGO | ASIGNATURA | MATRICULADOS | APROBADOS | DESAPROBADOS
+                    PERIODO | FACULTAD | ESCUELA | CODIGO | ASIGNATURA | GRUPOS | MATRICULADOS | APROBADOS | DESAPROBADOS | ABANDONOS | RETIROS | APROB 11-13 | APROB. 14-16 | APROB. 17-20 | PROMEDIO | DOCENTES | AÑO ESTUDIOS
                   </code>
+                  <span className="block mt-1">Obligatorias: PERIODO, ESCUELA, CODIGO, ASIGNATURA, MATRICULADOS, APROBADOS y DESAPROBADOS.</span>
                 </p>
                 <input
                   type="file"
@@ -217,11 +240,11 @@ export default function AdminUploadModal() {
                       <p className="font-bold text-slate-800">{summary.totalFilas}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500">Nuevos</p>
+                      <p className="text-slate-500">Filas nuevas</p>
                       <p className="font-bold text-emerald-600">{summary.nuevos}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500">Duplicados</p>
+                      <p className="text-slate-500">Filas en grupos duplicados</p>
                       <p className="font-bold text-orange-600">{summary.duplicados}</p>
                     </div>
                     <div>
@@ -255,23 +278,52 @@ export default function AdminUploadModal() {
                   </div>
                 )}
 
+                {duplicateGroups.length > 0 && (
+                  <div className="border border-orange-200 rounded-lg p-3 bg-orange-50 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-orange-900">Revisar grupos duplicados</p>
+                      <p className="text-[10px] text-orange-800">
+                        Por seguridad no se importan automáticamente. Elige una fila para reemplazar el registro existente o para conservar solo esa fila del Excel. Déjalo en «Omitir» para no importar ese grupo.
+                      </p>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {duplicateGroups.map((group) => {
+                        const first = group.rows[0];
+                        return (
+                          <label key={group.key} className="block rounded-lg border border-orange-200 bg-white p-2">
+                            <span className="block text-[10px] font-semibold text-slate-800">
+                              {first.periodo} · {first.facultad} · {first.escuela} · {first.codigo} · Grupo {first.grupo || '—'}
+                            </span>
+                            <span className="block text-[10px] text-slate-500">
+                              {group.exists ? 'Ya existe en la base de datos.' : 'La clave se repite en el archivo.'}
+                            </span>
+                            <select
+                              value={duplicateSelections[group.key] ?? ''}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setDuplicateSelections((current) => ({
+                                  ...current,
+                                  [group.key]: value ? Number(value) : '',
+                                }));
+                              }}
+                              className="mt-1.5 w-full rounded border border-slate-300 px-2 py-1 text-[10px]"
+                            >
+                              <option value="">Omitir este grupo</option>
+                              {group.rows.map((row) => (
+                                <option key={row._fila} value={row._fila}>
+                                  Fila {row._fila}: {row.asignatura} · aprobados {row.aprobados} · matriculados {row.matriculados}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {preview.length > 0 && (
                   <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 p-3 rounded-lg bg-white border border-slate-200">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-800">Opciones de importación</p>
-                        <p className="text-[10px] text-slate-500">Si activas reemplazo, las filas con la misma clave se actualizan.</p>
-                      </div>
-                      <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={replaceDuplicates}
-                          onChange={(e) => setReplaceDuplicates(e.target.checked)}
-                          className="h-4 w-4 rounded border-slate-300"
-                        />
-                        Reemplazar duplicados
-                      </label>
-                    </div>
                     <p className="text-xs font-semibold text-slate-700 mb-2">
                       Primeras {Math.min(5, preview.length)} filas a importar
                     </p>
@@ -313,7 +365,7 @@ export default function AdminUploadModal() {
                   </button>
                   <button
                     onClick={handleConfirm}
-                    disabled={summary.nuevos === 0}
+                    disabled={summary.nuevos === 0 && !Object.values(duplicateSelections).some((rowNumber) => typeof rowNumber === 'number')}
                     className="px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 rounded-md"
                   >
                     Confirmar importación
@@ -340,7 +392,7 @@ export default function AdminUploadModal() {
                   <div>
                     <p className="text-xs font-semibold text-emerald-900">Importación completada</p>
                     <p className="text-[10px] text-emerald-800 mt-1">
-                      Se agregaron {summary.nuevos} registros nuevos. El dashboard se actualizará automáticamente en la próxima recarga.
+                      Se guardaron {summary.nuevos} registros. Recarga el dashboard para ver los cambios.
                     </p>
                   </div>
                 </div>

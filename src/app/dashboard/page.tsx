@@ -22,12 +22,12 @@ import SchoolScorecard from '@/components/SchoolScorecard';
 import SubjectHeatmap from '@/components/SubjectHeatmap';
 import TeacherSearch from '@/components/TeacherSearch';
 
-function applyProgramFilter(dataset: DashboardDataset, filters: FilterState): DashboardDataset {
-  if (filters.facultad !== 'CIENCIAS DE LA EDUCACIÓN' || filters.escuela === 'ALL' || filters.programa === 'ALL') {
+function applyProgramFilter(dataset: DashboardDataset, facultad: string, escuela: string, programa: string): DashboardDataset {
+  if (facultad !== 'CIENCIAS DE LA EDUCACIÓN' || escuela === 'ALL' || programa === 'ALL') {
     return dataset;
   }
 
-  const programIdx = dataset.pr.indexOf(filters.programa);
+  const programIdx = dataset.pr.indexOf(programa);
   if (programIdx === -1) return dataset;
 
   const sa = dataset.sa.filter((row) => row[4] === programIdx);
@@ -67,10 +67,6 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!session) router.replace('/login');
   }, [session, router]);
-
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [tab, filters.facultad, filters.escuela, filters.programa, filters.anio, filters.periodo, filters.agrupacion, filters.indicador]);
 
   // 2. Cargar el dataset desde la API (reemplaza initialData.json estático)
   useEffect(() => {
@@ -116,13 +112,30 @@ export default function DashboardPage() {
   // permitida para el rol, no renderizamos su contenido.
   const currentTabAllowed = session ? canViewTab(session.role, tab) : false;
 
-  const viewDataset = useMemo(() => (dataset ? applyProgramFilter(dataset, filters) : null), [dataset, filters]);
-  const filteredAgg = useMemo(() => (viewDataset ? filterAgg(viewDataset.ag, filters) : []), [viewDataset, filters]);
+  const viewDataset = useMemo(
+    () => (dataset ? applyProgramFilter(dataset, filters.facultad, filters.escuela, filters.programa) : null),
+    [dataset, filters.facultad, filters.escuela, filters.programa]
+  );
+  const filteredAgg = useMemo(
+    () =>
+      viewDataset
+        ? filterAgg(viewDataset.ag, {
+            facultad: filters.facultad,
+            escuela: filters.escuela,
+            anio: filters.anio,
+            periodo: filters.periodo,
+          })
+        : [],
+    [viewDataset, filters.facultad, filters.escuela, filters.anio, filters.periodo]
+  );
   const groups = useMemo(
     () => (viewDataset ? groupBy(filteredAgg, filters.agrupacion === 'sem' ? (r) => r.PERIODO : (r) => String(r.AÑO)) : []),
     [viewDataset, filteredAgg, filters.agrupacion]
   );
-  const scorecardRows = useMemo(() => (viewDataset ? filterScorecard(viewDataset.sc, filters) : []), [viewDataset, filters]);
+  const scorecardRows = useMemo(
+    () => (viewDataset ? filterScorecard(viewDataset.sc, filters.facultad, filters.escuela) : []),
+    [viewDataset, filters.facultad, filters.escuela]
+  );
   const chScope = filters.facultad === 'ALL' ? 'UNSA' : filters.facultad;
 
   if (errorMsg) {
@@ -139,7 +152,15 @@ export default function DashboardPage() {
 
   const mobileFilters = (
     <div className="space-y-3">
-      <FiltersBar dataset={dataset} filters={filters} onChange={setFilters} scope={scope} />
+      <FiltersBar
+        dataset={dataset}
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setMobileMenuOpen(false);
+        }}
+        scope={scope}
+      />
     </div>
   );
 
@@ -158,7 +179,14 @@ export default function DashboardPage() {
         <FiltersBar dataset={dataset} filters={filters} onChange={setFilters} scope={scope} />
       </div>
 
-      <Tabs tabs={visibleTabs} active={tab} onChange={(k) => setTab(k as DashboardTab)} />
+      <Tabs
+        tabs={visibleTabs}
+        active={tab}
+        onChange={(k) => {
+          setTab(k as DashboardTab);
+          setMobileMenuOpen(false);
+        }}
+      />
 
       {currentTabAllowed && tab === 'resumen' && (
         <div className="space-y-5">

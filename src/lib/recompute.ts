@@ -3,12 +3,12 @@ import { rate, YEARS } from '@/lib/data-utils';
 
 /**
  * Reconstruye `ag` (totales por periodo/facultad/escuela) y `sc` (scorecard por
- * escuela con tendencia/CV/brecha) a partir de las filas crudas `sa`.
+ * escuela con tendencia) a partir de las filas crudas `sa`.
  * Se ejecuta cada vez que el administrador carga un Excel nuevo, para que los
  * gráficos y tablas reflejen la información recién agregada sin reabrir la app.
  */
 export function recomputeDerived(d: DashboardDataset): DashboardDataset {
-  const { ps: P, fs: F, es: E, pr: R } = d;
+  const { ps: P, fs: F, es: E } = d;
 
   // ── 1. Reconstruir `ag`: totales por PERIODO x FACULTAD x ESCUELA ──
   const aggMap = new Map<string, AggregatedRow>();
@@ -49,7 +49,7 @@ export function recomputeDerived(d: DashboardDataset): DashboardDataset {
     const tb_ = rows.reduce((s, r) => s + r.b, 0);
     const tr_ = rows.reduce((s, r) => s + r.r, 0);
 
-    // tasa de aprobación por año (para tendencia, CV y brecha)
+    // Tasa de aprobación por año para calcular la tendencia.
     const yr: Record<string, number> = {};
     YEARS.forEach((y) => {
       const yrRows = rows.filter((r) => r.AÑO === y);
@@ -72,14 +72,6 @@ export function recomputeDerived(d: DashboardDataset): DashboardDataset {
       const denom = n * sx2 - sx * sx;
       sl = denom !== 0 ? (n * sxy - sx * sy) / denom : 0;
     }
-    // coeficiente de variación de la tasa anual
-    const vals = yearVals.map(([, v]) => v);
-    const mean = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
-    const variance = vals.length ? vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length : 0;
-    const cv = mean !== 0 ? (Math.sqrt(variance) / mean) * 100 : 0;
-    // brecha = diferencia entre el año más alto y el más bajo
-    const br = vals.length ? Math.max(...vals) - Math.min(...vals) : 0;
-
     return {
       e: escuela,
       f: facultad,
@@ -90,9 +82,7 @@ export function recomputeDerived(d: DashboardDataset): DashboardDataset {
       tb: rate(tb_, tm),
       tn: rate(tr_ + tb_, tm),
       sl,
-      cv,
       yr,
-      br,
     };
   });
 

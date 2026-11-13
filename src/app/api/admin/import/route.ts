@@ -6,6 +6,8 @@ interface ImportBody {
   rows: ImportRow[];
   sourceFile: string;
   mode: 'preview' | 'commit' | 'replace';
+  duplicateSelections?: Record<string, number>;
+  validationErrors?: { fila: number; motivo: string }[];
 }
 
 interface Summary {
@@ -15,6 +17,12 @@ interface Summary {
   errores: { fila: number; motivo: string }[];
 }
 
+interface DuplicateGroup {
+  key: string;
+  exists: boolean;
+  rowNumbers: number[];
+}
+
 type AppEnv = CloudflareEnv & {
   DB?: D1Database;
   DB_REMOTE?: D1Database;
@@ -22,8 +30,43 @@ type AppEnv = CloudflareEnv & {
 
 const BATCH_SIZE = 50; // filas por sentencia D1.batch()
 
-function rowKey(r: Pick<ImportRow, 'escuela' | 'periodo' | 'codigo' | 'grupo'>) {
-  return `${r.escuela}|||${r.periodo}|||${r.codigo}|||${r.grupo}`;
+function rowKey(r: Pick<ImportRow, 'periodo' | 'facultad' | 'escuela' | 'codigo' | 'grupo'>) {
+  return JSON.stringify([r.periodo, r.facultad, r.escuela, r.codigo, r.grupo]);
+}
+
+async function findExistingKeys(db: D1Database, rows: ImportRow[]) {
+  const periodos = Array.from(new Set(rows.map((r) => r.periodo)));
+  if (!periodos.length) return new Set<string>();
+
+  const placeholders = periodos.map(() => '?').join(',');
+  const result = await db
+    .prepare(
+      `SELECT periodo, facultad, escuela, codigo, grupo
+       FROM academic_records WHERE periodo IN (${placeholders})`
+    )
+    .bind(...periodos)
+    .all<Pick<ImportRow, 'periodo' | 'facultad' | 'escuela' | 'codigo' | 'grupo'>>();
+
+  return new Set((result.results ?? []).map(rowKey));
+}
+
+function groupByKey(rows: ImportRow[]) {
+  const groups = new Map<string, ImportRow[]>();
+  for (const row of rows) {
+    const key = rowKey(row);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+function getDuplicateGroups(rows: ImportRow[], existingKeys: Set<string>): DuplicateGroup[] {
+  return Array.from(groupByKey(rows), ([key, group]) => ({
+    key,
+    exists: existingKeys.has(key),
+    rowNumbers: group.map((row) => row._fila),
+  })).filter((group) => group.exists || group.rowNumbers.length > 1);
 }
 
 export async function POST(request: Request) {
@@ -58,64 +101,65 @@ export async function POST(request: Request) {
     return Response.json({ error: 'La base de datos D1 (binding DB) no está configurada en este entorno.' }, { status: 500 });
   }
 
-  // Sólo se consultan las claves de los periodos presentes en el archivo,
-  // no toda la tabla — evita traer millones de filas para deduplicar.
-  const periodos = Array.from(new Set(rows.map((r) => r.periodo)));
-  const placeholders = periodos.map(() => '?').join(',');
-  const existingRes = await db
-    .prepare(`SELECT escuela, periodo, codigo, grupo FROM academic_records WHERE periodo IN (${placeholders})`)
-    .bind(...periodos)
-    .all<{ escuela: string; periodo: string; codigo: string; grupo: string }>();
-  const existingKeys = new Set((existingRes.results ?? []).map(rowKey));
-
+  const existingKeys = await findExistingKeys(db, rows);
+  const groups = groupByKey(rows);
+  const duplicateGroups = getDuplicateGroups(rows, existingKeys);
+  const duplicateGroupKeys = new Set(duplicateGroups.map((group) => group.key));
+  const duplicateSelections = body.duplicateSelections ?? {};
   const nuevas: ImportRow[] = [];
-  let duplicados = 0;
-  const seenInFile = new Set<string>();
+  let duplicateRows = 0;
 
-  for (const r of rows) {
-    const key = rowKey(r);
-    if ((mode !== 'replace' && existingKeys.has(key)) || seenInFile.has(key)) {
-      duplicados += 1;
+  for (const [key, group] of groups) {
+    if (!duplicateGroupKeys.has(key)) {
+      nuevas.push(group[0]);
       continue;
     }
-    seenInFile.add(key);
-    nuevas.push(r);
+
+    duplicateRows += group.length;
+    const selectedRowNumber =
+      duplicateSelections[key] ??
+      (mode === 'replace' ? group[group.length - 1]._fila : undefined);
+    if (selectedRowNumber === undefined) continue;
+
+    const selectedRow = group.find((row) => row._fila === selectedRowNumber);
+    if (!selectedRow) {
+      return Response.json({ error: `La fila seleccionada para el duplicado ${key} no pertenece al archivo.` }, { status: 400 });
+    }
+    nuevas.push(selectedRow);
+  }
+
+  for (const [key, rowNumber] of Object.entries(duplicateSelections)) {
+    if (!groups.get(key)?.some((row) => row._fila === rowNumber)) {
+      return Response.json({ error: 'La selección de duplicados ya no coincide con las filas del archivo.' }, { status: 400 });
+    }
   }
 
   const summary: Summary = {
     totalFilas: rows.length,
     nuevos: nuevas.length,
-    duplicados,
-    errores: [], // los errores de formato ya se filtraron en el cliente (excelParser); aquí solo dedup
+    duplicados: duplicateRows,
+    errores: body.validationErrors ?? [],
   };
 
   if (mode === 'preview') {
-    return Response.json({ summary, preview: nuevas.slice(0, 50) });
+    const duplicatePreviews = duplicateGroups.map((group) => ({
+      ...group,
+      rows: groups.get(group.key) ?? [],
+    }));
+    return Response.json({ summary, preview: nuevas.slice(0, 50), duplicateGroups: duplicatePreviews });
   }
 
-  // mode === 'commit': inserta en lotes. INSERT OR IGNORE es la red de
-  // seguridad final por si dos cargas concurrentes chocan en la misma clave.
+  // Inserta o reemplaza en lotes; cada grupo duplicado se procesa como una sola fila.
   const insertInto = (targetDb: D1Database) =>
     (async () => {
       for (let i = 0; i < nuevas.length; i += BATCH_SIZE) {
         const chunk = nuevas.slice(i, i + BATCH_SIZE);
-        if (mode === 'replace') {
-          const deleteStmts = chunk.map((r) =>
-            targetDb
-              .prepare(
-                `DELETE FROM academic_records
-                 WHERE escuela = ? AND periodo = ? AND codigo = ? AND grupo = ?`
-              )
-              .bind(r.escuela, r.periodo, r.codigo, r.grupo)
-          );
-          await targetDb.batch(deleteStmts);
-        }
         const stmts = chunk.map((r) =>
           targetDb
             .prepare(
               `INSERT OR REPLACE INTO academic_records
-               (periodo, anio, facultad, escuela, programa, codigo, cod_asig, digito, nro, asignatura, grupo, docente, matriculados, aprobados, desaprobados, abandonos, retiros, promedio, source_file)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+               (periodo, anio, facultad, escuela, programa, codigo, cod_asig, digito, nro, asignatura, grupo, docente, matriculados, aprobados, desaprobados, abandonos, retiros, aprob_11_13, aprob_14_16, aprob_17_20, anio_estudios, promedio, source_file)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             )
             .bind(
               r.periodo,
@@ -135,6 +179,10 @@ export async function POST(request: Request) {
               r.desaprobados,
               r.abandonos,
               r.retiros,
+              r.aprob1113,
+              r.aprob1416,
+              r.aprob1720,
+              r.anioEstudios,
               r.promedio,
               sourceFile ?? ''
             )

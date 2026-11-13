@@ -102,14 +102,17 @@ export default function TopBar({
               <div className="text-[10px] uppercase tracking-[0.12em]" style={{ color: 'var(--texto-sec)' }}>
                 Sesión
               </div>
-              <button
-                onClick={onLogout}
-                className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-2 rounded-lg border transition"
-                style={{ backgroundColor: 'var(--granate)', borderColor: 'var(--granate-oscuro)' }}
-              >
-                <LogOut size={14} />
-                Salir
-              </button>
+              <div className="flex items-center gap-2">
+                {adminAction}
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-2 rounded-lg border transition"
+                  style={{ backgroundColor: 'var(--granate)', borderColor: 'var(--granate-oscuro)' }}
+                >
+                  <LogOut size={14} />
+                  Salir
+                </button>
+              </div>
             </div>
           </div>
           </div>

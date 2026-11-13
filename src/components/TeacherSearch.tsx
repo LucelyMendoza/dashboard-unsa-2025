@@ -23,39 +23,88 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
     if (q.trim().length < 3) return null;
     const qu = q.toUpperCase();
     const matches = dataset.dc.filter((r) => {
-      if (!DN[r[0]].toUpperCase().includes(qu)) return false;
+      if (!DN[r[0]]?.toUpperCase().includes(qu)) return false;
       if (filters.facultad !== 'ALL' && F[r[2]] !== filters.facultad) return false;
       if (filters.escuela !== 'ALL' && E[r[3]] !== filters.escuela) return false;
       return true;
     });
     if (!matches.length) return [];
 
-    const byTeacher: Record<
-      string,
-      { p: string; f: string; e: string; a: string; m: number; ap: number; d: number; ab: number; ret: number }[]
-    > = {};
+    type CourseSummary = {
+      p: string;
+      year: string;
+      f: string;
+      e: string;
+      a: string;
+      m: number;
+      ap: number;
+      d: number;
+      ab: number;
+      ret: number;
+    };
+    const byTeacher = new Map<string, Map<string, CourseSummary>>();
     matches.forEach((r) => {
       const name = DN[r[0]];
-      if (!byTeacher[name]) byTeacher[name] = [];
-      byTeacher[name].push({ p: P[r[1]], f: F[r[2]], e: E[r[3]], a: AN[r[4]], m: r[5], ap: r[6], d: r[7], ab: r[8], ret: r[9] });
+      let courses = byTeacher.get(name);
+      if (!courses) {
+        courses = new Map();
+        byTeacher.set(name, courses);
+      }
+
+      const period = P[r[1]];
+      const faculty = F[r[2]];
+      const school = E[r[3]];
+      const subject = AN[r[4]];
+      const key = JSON.stringify([period, faculty, school, subject]);
+      let course = courses.get(key);
+      if (!course) {
+        course = {
+          p: period,
+          year: period.slice(0, 4),
+          f: faculty,
+          e: school,
+          a: subject,
+          m: 0,
+          ap: 0,
+          d: 0,
+          ab: 0,
+          ret: 0,
+        };
+        courses.set(key, course);
+      }
+
+      course.m += r[6];
+      course.ap += r[7];
+      course.d += r[8];
+      course.ab += r[9];
+      course.ret += r[10];
     });
 
-    return Object.keys(byTeacher)
-      .sort()
-      .slice(0, 10)
-      .map((name) => {
-        const rows = byTeacher[name].sort((a, b) => a.p.localeCompare(b.p));
-        const tm = rows.reduce((s, r) => s + r.m, 0);
-        const ta = rows.reduce((s, r) => s + r.ap, 0);
-        const tab = rows.reduce((s, r) => s + r.ab, 0);
-        const tret = rows.reduce((s, r) => s + r.ret, 0);
-        const gr = rate(ta, tm);
-        const ncr = tm > 0 ? ((tab + tret) / tm) * 100 : 0;
-        const subjects = [...new Set(rows.map((r) => r.a))];
-        const facEsc = rows[0].f + (rows[0].e && rows[0].e !== rows[0].f ? ' · ' + rows[0].e : '');
-        return { name, rows, tm, gr, ncr, subjects, facEsc };
-      });
-  }, [q, dataset, filters, F, E, AN, DN, P]);
+    return Array.from(byTeacher, ([name, courses]) => {
+      const rows = Array.from(courses.values()).sort((a, b) => a.p.localeCompare(b.p) || a.a.localeCompare(b.a));
+      const tm = rows.reduce((sum, row) => sum + row.m, 0);
+      const ta = rows.reduce((sum, row) => sum + row.ap, 0);
+      const td = rows.reduce((sum, row) => sum + row.d, 0);
+      const tab = rows.reduce((sum, row) => sum + row.ab, 0);
+      const tret = rows.reduce((sum, row) => sum + row.ret, 0);
+      const subjects = [...new Set(rows.map((row) => row.a))];
+      const locations = [...new Set(rows.map((row) => row.f + (row.e && row.e !== row.f ? ` · ${row.e}` : '')))];
+      return {
+        name,
+        rows,
+        tm,
+        ta,
+        td,
+        tab,
+        tret,
+        gr: rate(ta, tm),
+        subjects,
+        locations,
+      };
+    })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 10);
+  }, [q, dataset, filters.facultad, filters.escuela, F, E, AN, DN, P]);
 
   return (
     <div>
@@ -83,13 +132,17 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
             <div className="flex items-start justify-between flex-wrap gap-2 mb-2">
               <div>
                 <span className="font-bold text-sm">{t.name}</span>
-                <span className="text-[11px] text-slate-400 ml-2">{t.facEsc}</span>
+                <span className="text-[11px] text-slate-400 ml-2">{t.locations.join(' | ')}</span>
               </div>
               <div className="flex gap-1.5 flex-wrap items-center">
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100">Matr.: {fmt(t.tm)}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100">Aprob.: {fmt(t.ta)}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100">Desap.: {fmt(t.td)}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100">Retiros: {fmt(t.tret)}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100">Abandonos: {fmt(t.tab)}</span>
                 <span className={`text-[11px] px-2 py-0.5 rounded-full bg-slate-100 font-semibold ${HEAT_TEXT[hmClass(t.gr)]}`}>
-                  T.Apr: {pct(t.gr)}
+                  Tasa aprob.: {pct(t.gr)}
                 </span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">No Culm: {t.ncr.toFixed(1)}%</span>
               </div>
             </div>
             <p className="text-[11px] text-slate-400 mb-2">{t.subjects.length} asignatura(s): {t.subjects.slice(0, 4).join(', ')}{t.subjects.length > 4 ? '…' : ''}</p>
@@ -97,20 +150,30 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
               <table className="w-full text-[11px] whitespace-nowrap">
                 <thead>
                   <tr className="text-slate-400">
+                    <th className="text-left px-1 py-1">Año</th>
                     <th className="text-left px-1 py-1">Periodo</th>
+                    <th className="text-left px-1 py-1">Escuela</th>
                     <th className="text-left px-1 py-1">Asignatura</th>
                     <th className="text-right px-1 py-1">Matr.</th>
                     <th className="text-right px-1 py-1">Aprob.</th>
-                    <th className="text-right px-1 py-1">Tasa</th>
+                    <th className="text-right px-1 py-1">Desap.</th>
+                    <th className="text-right px-1 py-1">Retiros</th>
+                    <th className="text-right px-1 py-1">Abandonos</th>
+                    <th className="text-right px-1 py-1">Tasa aprob.</th>
                   </tr>
                 </thead>
                 <tbody>
                   {t.rows.map((r, i) => (
                     <tr key={i} className="border-t border-slate-100">
+                      <td className="px-1 py-1">{r.year}</td>
                       <td className="px-1 py-1">{r.p}</td>
+                      <td className="px-1 py-1">{r.e}</td>
                       <td className="px-1 py-1">{r.a}</td>
                       <td className="text-right px-1 py-1">{fmt(r.m)}</td>
                       <td className="text-right px-1 py-1">{fmt(r.ap)}</td>
+                      <td className="text-right px-1 py-1">{fmt(r.d)}</td>
+                      <td className="text-right px-1 py-1">{fmt(r.ret)}</td>
+                      <td className="text-right px-1 py-1">{fmt(r.ab)}</td>
                       <td className="text-right px-1 py-1 font-semibold">{pct(rate(r.ap, r.m))}</td>
                     </tr>
                   ))}

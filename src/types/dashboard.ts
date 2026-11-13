@@ -36,9 +36,7 @@ export interface ScorecardRow {
   tb: number;
   tn: number;
   sl: number;
-  cv: number;
   yr: Record<string, number>;
-  br: number;
 }
 
 export type SubjectRow = [
