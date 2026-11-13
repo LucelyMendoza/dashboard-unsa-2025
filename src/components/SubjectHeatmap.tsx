@@ -70,23 +70,23 @@ export default function SubjectHeatmap({
     () => filterSubjectRows(dataset, filters.facultad, filters.escuela, filters.anio, filters.periodo),
     [dataset, filters.facultad, filters.escuela, filters.anio, filters.periodo]
   );
-  const { an: AN, ps: P } = dataset;
+  const { an: AN, ac: AC, ps: P } = dataset;
 
   const byA = useMemo(() => {
-    const result: Record<string, Record<string, { m: number; apr: number; des: number; abn: number; ret: number }>> = {};
+    const result: Record<number, Record<string, { m: number; apr: number; des: number; abn: number; ret: number }>> = {};
     sa.forEach((r) => {
-      const n = AN[r[3]];
+      const subjectIndex = r[3];
       const p = P[r[0]];
-      if (!result[n]) result[n] = {};
-      if (!result[n][p]) result[n][p] = { m: 0, apr: 0, des: 0, abn: 0, ret: 0 };
-      result[n][p].m += r[5];
-      result[n][p].apr += r[6];
-      result[n][p].des += r[7];
-      result[n][p].abn += r[8];
-      result[n][p].ret += r[9];
+      if (!result[subjectIndex]) result[subjectIndex] = {};
+      if (!result[subjectIndex][p]) result[subjectIndex][p] = { m: 0, apr: 0, des: 0, abn: 0, ret: 0 };
+      result[subjectIndex][p].m += r[5];
+      result[subjectIndex][p].apr += r[6];
+      result[subjectIndex][p].des += r[7];
+      result[subjectIndex][p].abn += r[8];
+      result[subjectIndex][p].ret += r[9];
     });
     return result;
-  }, [sa, AN, P]);
+  }, [sa, P]);
 
   const periodList =
     filters.periodo !== 'ALL' ? [filters.periodo] : filters.anio !== 'ALL' ? P.filter((p) => p.startsWith(filters.anio)) : P;
@@ -94,17 +94,18 @@ export default function SubjectHeatmap({
   const aggList = useMemo(
     () =>
       Object.keys(byA)
-        .map((n) => {
+        .map(Number)
+        .map((subjectIndex) => {
           let tm = 0;
           let tv = 0;
-          Object.values(byA[n]).forEach((values) => {
+          Object.values(byA[subjectIndex]).forEach((values) => {
             tm += values.m;
             tv += values[metric];
           });
-          return { n, rate: rate(tv, tm), t: tm };
+          return { subjectIndex, rate: rate(tv, tm), t: tm };
         })
-        .sort((a, b) => a.rate - b.rate || a.n.localeCompare(b.n)),
-    [byA, metric]
+        .sort((a, b) => a.rate - b.rate || AN[a.subjectIndex].localeCompare(AN[b.subjectIndex]) || AC[a.subjectIndex].localeCompare(AC[b.subjectIndex])),
+    [byA, metric, AN, AC]
   );
   const pageCount = Math.max(1, Math.ceil(aggList.length / pageSize));
   const visiblePage = Math.min(page, pageCount - 1);
@@ -146,7 +147,8 @@ export default function SubjectHeatmap({
         <table className="academic-table min-w-max text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 min-w-[240px] text-left">Asignatura</th>
+              <th className="sticky left-0 z-20 min-w-[120px] text-left">CODIGO</th>
+              <th className="min-w-[240px] text-left">Asignatura</th>
               <th className="min-w-[115px] text-right">Global %</th>
               {periodList.map((p) => (
                 <th key={p} className="min-w-[72px] text-right">{p}</th>
@@ -158,17 +160,18 @@ export default function SubjectHeatmap({
             {pageRows.map((a, i) => {
               const globalBand = METRICS[metric].bands[getRateBand(metric, a.rate)];
               return (
-                <tr key={a.n} className={`border-t border-slate-100 transition-colors hover:bg-slate-50 ${i % 2 ? 'bg-slate-50/40' : 'bg-white'}`}>
-                  <td className={`sticky left-0 max-w-[360px] truncate px-3 py-2.5 font-medium text-slate-700 ${i % 2 ? 'bg-slate-50' : 'bg-white'}`} title={a.n}>
-                    {a.n}
-                  </td>
+                <tr key={a.subjectIndex} className={`border-t border-slate-100 transition-colors hover:bg-slate-50 ${i % 2 ? 'bg-slate-50/40' : 'bg-white'}`}>
+                    <td className="sticky left-0 z-[1] bg-inherit font-mono text-[11px] text-slate-600">{AC[a.subjectIndex] || '—'}</td>
+                    <td className="max-w-[360px] truncate font-medium text-slate-700" title={AN[a.subjectIndex]}>
+                      {AN[a.subjectIndex]}
+                    </td>
                   <td className="px-3 py-2 text-right">
                     <span className={`inline-flex min-w-[68px] justify-end rounded-md px-2 py-1 font-semibold tabular-nums ${globalBand}`}>
                       {a.rate.toFixed(1)}%
                     </span>
                   </td>
                   {periodList.map((p) => {
-                    const d = byA[a.n]?.[p];
+                    const d = byA[a.subjectIndex]?.[p];
                     if (!d) return <td key={p} className="px-3 py-2 text-right text-slate-300">—</td>;
                     const value = rate(d[metric], d.m);
                     const band = METRICS[metric].bands[getRateBand(metric, value)];

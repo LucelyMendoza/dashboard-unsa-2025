@@ -311,7 +311,7 @@ export default function AdminUploadModal() {
                               <option value="">Omitir este grupo</option>
                               {group.rows.map((row) => (
                                 <option key={row._fila} value={row._fila}>
-                                  Fila {row._fila}: {row.asignatura} · aprobados {row.aprobados} · matriculados {row.matriculados}
+                                  Fila {row._fila}: {row.codigo} · {row.asignatura} · aprobados {row.aprobados} · matriculados {row.matriculados}
                                 </option>
                               ))}
                             </select>
@@ -333,6 +333,7 @@ export default function AdminUploadModal() {
                           <tr>
                             <th className="text-left">Periodo</th>
                             <th className="text-left">Escuela</th>
+                            <th className="text-left">CODIGO</th>
                             <th className="text-left">Asignatura</th>
                             <th className="text-right">Mat.</th>
                             <th className="text-right">Apr.</th>
@@ -344,6 +345,7 @@ export default function AdminUploadModal() {
                             <tr key={i}>
                               <td>{row.periodo}</td>
                               <td>{row.escuela}</td>
+                              <td className="font-mono">{row.codigo}</td>
                               <td>{row.asignatura.slice(0, 20)}</td>
                               <td className="text-right">{row.matriculados}</td>
                               <td className="text-right">{row.aprobados}</td>

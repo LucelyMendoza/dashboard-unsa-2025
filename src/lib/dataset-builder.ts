@@ -17,6 +17,7 @@ export function buildDataset(rows: ImportRow[]): DashboardDataset {
   const es: string[] = [];
   const pr: string[] = [];
   const an: string[] = [];
+  const ac: string[] = [];
   const dn: string[] = [];
   const sa: DashboardDataset['sa'] = [];
   const dc: DashboardDataset['dc'] = [];
@@ -29,14 +30,14 @@ export function buildDataset(rows: ImportRow[]): DashboardDataset {
     an: new Map<string, number>(),
   };
 
-  const getOrAdd = (list: string[], index: Map<string, number>, val: string) => {
+  const getOrAdd = (list: string[], index: Map<string, number>, val: string, key = val) => {
     const v = val?.trim() || '(sin especificar)';
-    const existing = index.get(v);
+    const existing = index.get(key);
     if (existing !== undefined) return existing;
 
     const idx = list.length;
     list.push(v);
-    index.set(v, idx);
+    index.set(key, idx);
     return idx;
   };
 
@@ -49,7 +50,9 @@ export function buildDataset(rows: ImportRow[]): DashboardDataset {
     const idEsc = getOrAdd(es, indexes.es, row.escuela);
     const idPro = getOrAdd(pr, indexes.pr, row.programa);
     const idPer = getOrAdd(ps, indexes.ps, row.periodo);
-    const idAsi = getOrAdd(an, indexes.an, row.asignatura);
+    const codigo = row.codigo.trim() || row.codAsig.trim();
+    const idAsi = getOrAdd(an, indexes.an, row.asignatura, JSON.stringify([codigo, row.asignatura]));
+    if (idAsi === ac.length) ac.push(codigo);
 
     if (!fe[row.facultad]) fe[row.facultad] = [];
     if (!fe[row.facultad].includes(row.escuela)) fe[row.facultad].push(row.escuela);
@@ -60,6 +63,6 @@ export function buildDataset(rows: ImportRow[]): DashboardDataset {
     dc.push([idDoc, idPer, idFac, idEsc, idAsi, idPro, row.matriculados, row.aprobados, row.desaprobados, row.abandonos, row.retiros]);
   });
 
-  const base: DashboardDataset = { fe, ep, ps, fs, es, pr, an, dn, ag: [], sa, dc, sc: [], cd: [] };
+  const base: DashboardDataset = { fe, ep, ps, fs, es, pr, an, ac, dn, ag: [], sa, dc, sc: [], cd: [] };
   return recomputeDerived(base);
 }

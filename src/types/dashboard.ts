@@ -75,6 +75,7 @@ export interface DashboardDataset {
   es: string[];
   pr: string[];
   an: string[];
+  ac: string[];
   dn: string[];
   ag: AggregatedRow[];
   sa: SubjectRow[];

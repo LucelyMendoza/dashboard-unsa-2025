@@ -17,7 +17,7 @@ const HEAT_TEXT: Record<string, string> = {
 
 export default function TeacherSearch({ dataset, filters }: { dataset: DashboardDataset; filters: FilterState }) {
   const [q, setQ] = useState('');
-  const { fs: F, es: E, an: AN, dn: DN, ps: P } = dataset;
+  const { fs: F, es: E, an: AN, ac: AC, dn: DN, ps: P } = dataset;
 
   const results = useMemo(() => {
     if (q.trim().length < 3) return null;
@@ -35,6 +35,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
       year: string;
       f: string;
       e: string;
+      code: string;
       a: string;
       m: number;
       ap: number;
@@ -55,7 +56,8 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
       const faculty = F[r[2]];
       const school = E[r[3]];
       const subject = AN[r[4]];
-      const key = JSON.stringify([period, faculty, school, subject]);
+      const code = AC[r[4]] ?? '';
+      const key = JSON.stringify([period, faculty, school, code, subject]);
       let course = courses.get(key);
       if (!course) {
         course = {
@@ -63,6 +65,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
           year: period.slice(0, 4),
           f: faculty,
           e: school,
+          code,
           a: subject,
           m: 0,
           ap: 0,
@@ -87,7 +90,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
       const td = rows.reduce((sum, row) => sum + row.d, 0);
       const tab = rows.reduce((sum, row) => sum + row.ab, 0);
       const tret = rows.reduce((sum, row) => sum + row.ret, 0);
-      const subjects = [...new Set(rows.map((row) => row.a))];
+      const subjects = [...new Set(rows.map((row) => `${row.code} ${row.a}`.trim()))];
       const locations = [...new Set(rows.map((row) => row.f + (row.e && row.e !== row.f ? ` · ${row.e}` : '')))];
       return {
         name,
@@ -104,7 +107,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
     })
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, 10);
-  }, [q, dataset, filters.facultad, filters.escuela, F, E, AN, DN, P]);
+  }, [q, dataset, filters.facultad, filters.escuela, F, E, AN, AC, DN, P]);
 
   return (
     <div>
@@ -153,6 +156,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
                     <th className="text-left">Año</th>
                     <th className="text-left">Periodo</th>
                     <th className="text-left">Escuela</th>
+                    <th className="text-left">CODIGO</th>
                     <th className="text-left">Asignatura</th>
                     <th className="text-right">Matr.</th>
                     <th className="text-right">Aprob.</th>
@@ -168,6 +172,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
                       <td>{r.year}</td>
                       <td>{r.p}</td>
                       <td>{r.e}</td>
+                      <td className="font-mono text-slate-600">{r.code || '—'}</td>
                       <td>{r.a}</td>
                       <td className="text-right">{fmt(r.m)}</td>
                       <td className="text-right">{fmt(r.ap)}</td>
