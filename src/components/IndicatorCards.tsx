@@ -37,23 +37,23 @@ export default function IndicatorCards({ groups }: { groups: GroupedTotals[] }) 
               </span>
               <span className="text-xs text-slate-400">{trend}</span>
             </div>
-            <div className="overflow-x-auto -mx-1">
-              <table className="w-full text-[11px]">
+            <div className="academic-table-shell mt-3">
+              <table className="academic-table text-[11px]">
                 <thead>
-                  <tr className="text-slate-400">
-                    <th className="text-left font-semibold px-1 py-1">Periodo</th>
-                    <th className="text-right font-semibold px-1 py-1">Cantidad</th>
-                    <th className="text-right font-semibold px-1 py-1">Matric.</th>
-                    <th className="text-right font-semibold px-1 py-1">Tasa</th>
+                  <tr>
+                    <th className="text-left">Periodo</th>
+                    <th className="text-right">Cantidad</th>
+                    <th className="text-right">Matric.</th>
+                    <th className="text-right">Tasa</th>
                   </tr>
                 </thead>
                 <tbody>
                   {vals.map((v) => (
-                    <tr key={v.l} className="border-t border-slate-100">
-                      <td className="px-1 py-1">{v.l}</td>
-                      <td className="text-right px-1 py-1">{fmt(v.abs)}</td>
-                      <td className="text-right px-1 py-1">{fmt(v.m)}</td>
-                      <td className="text-right px-1 py-1 font-semibold" style={{ color: ind.color }}>
+                    <tr key={v.l}>
+                      <td>{v.l}</td>
+                      <td className="text-right">{fmt(v.abs)}</td>
+                      <td className="text-right">{fmt(v.m)}</td>
+                      <td className="text-right font-semibold" style={{ color: ind.color }}>
                         {pct(v.v)}
                       </td>
                     </tr>

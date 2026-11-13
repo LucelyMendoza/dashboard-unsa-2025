@@ -327,27 +327,27 @@ export default function AdminUploadModal() {
                     <p className="text-xs font-semibold text-slate-700 mb-2">
                       Primeras {Math.min(5, preview.length)} filas a importar
                     </p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-[10px] text-slate-700">
+                    <div className="academic-table-shell">
+                      <table className="academic-table text-[10px] text-slate-700">
                         <thead>
-                          <tr className="border-b border-slate-200 bg-slate-100">
-                            <th className="text-left px-2 py-1">Periodo</th>
-                            <th className="text-left px-2 py-1">Escuela</th>
-                            <th className="text-left px-2 py-1">Asignatura</th>
-                            <th className="text-right px-2 py-1">Mat.</th>
-                            <th className="text-right px-2 py-1">Apr.</th>
-                            <th className="text-right px-2 py-1">Des.</th>
+                          <tr>
+                            <th className="text-left">Periodo</th>
+                            <th className="text-left">Escuela</th>
+                            <th className="text-left">Asignatura</th>
+                            <th className="text-right">Mat.</th>
+                            <th className="text-right">Apr.</th>
+                            <th className="text-right">Des.</th>
                           </tr>
                         </thead>
                         <tbody>
                           {preview.slice(0, 5).map((row, i) => (
-                            <tr key={i} className="border-b border-slate-100 hover:bg-slate-100">
-                              <td className="px-2 py-1">{row.periodo}</td>
-                              <td className="px-2 py-1">{row.escuela}</td>
-                              <td className="px-2 py-1">{row.asignatura.slice(0, 20)}</td>
-                              <td className="text-right px-2 py-1">{row.matriculados}</td>
-                              <td className="text-right px-2 py-1">{row.aprobados}</td>
-                              <td className="text-right px-2 py-1">{row.desaprobados}</td>
+                            <tr key={i}>
+                              <td>{row.periodo}</td>
+                              <td>{row.escuela}</td>
+                              <td>{row.asignatura.slice(0, 20)}</td>
+                              <td className="text-right">{row.matriculados}</td>
+                              <td className="text-right">{row.aprobados}</td>
+                              <td className="text-right">{row.desaprobados}</td>
                             </tr>
                           ))}
                         </tbody>

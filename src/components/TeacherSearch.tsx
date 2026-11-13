@@ -146,35 +146,35 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
               </div>
             </div>
             <p className="text-[11px] text-slate-400 mb-2">{t.subjects.length} asignatura(s): {t.subjects.slice(0, 4).join(', ')}{t.subjects.length > 4 ? '…' : ''}</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[11px] whitespace-nowrap">
+            <div className="academic-table-shell">
+              <table className="academic-table text-[11px] whitespace-nowrap">
                 <thead>
-                  <tr className="text-slate-400">
-                    <th className="text-left px-1 py-1">Año</th>
-                    <th className="text-left px-1 py-1">Periodo</th>
-                    <th className="text-left px-1 py-1">Escuela</th>
-                    <th className="text-left px-1 py-1">Asignatura</th>
-                    <th className="text-right px-1 py-1">Matr.</th>
-                    <th className="text-right px-1 py-1">Aprob.</th>
-                    <th className="text-right px-1 py-1">Desap.</th>
-                    <th className="text-right px-1 py-1">Retiros</th>
-                    <th className="text-right px-1 py-1">Abandonos</th>
-                    <th className="text-right px-1 py-1">Tasa aprob.</th>
+                  <tr>
+                    <th className="text-left">Año</th>
+                    <th className="text-left">Periodo</th>
+                    <th className="text-left">Escuela</th>
+                    <th className="text-left">Asignatura</th>
+                    <th className="text-right">Matr.</th>
+                    <th className="text-right">Aprob.</th>
+                    <th className="text-right">Desap.</th>
+                    <th className="text-right">Retiros</th>
+                    <th className="text-right">Abandonos</th>
+                    <th className="text-right">Tasa aprob.</th>
                   </tr>
                 </thead>
                 <tbody>
                   {t.rows.map((r, i) => (
-                    <tr key={i} className="border-t border-slate-100">
-                      <td className="px-1 py-1">{r.year}</td>
-                      <td className="px-1 py-1">{r.p}</td>
-                      <td className="px-1 py-1">{r.e}</td>
-                      <td className="px-1 py-1">{r.a}</td>
-                      <td className="text-right px-1 py-1">{fmt(r.m)}</td>
-                      <td className="text-right px-1 py-1">{fmt(r.ap)}</td>
-                      <td className="text-right px-1 py-1">{fmt(r.d)}</td>
-                      <td className="text-right px-1 py-1">{fmt(r.ret)}</td>
-                      <td className="text-right px-1 py-1">{fmt(r.ab)}</td>
-                      <td className="text-right px-1 py-1 font-semibold">{pct(rate(r.ap, r.m))}</td>
+                    <tr key={i}>
+                      <td>{r.year}</td>
+                      <td>{r.p}</td>
+                      <td>{r.e}</td>
+                      <td>{r.a}</td>
+                      <td className="text-right">{fmt(r.m)}</td>
+                      <td className="text-right">{fmt(r.ap)}</td>
+                      <td className="text-right">{fmt(r.d)}</td>
+                      <td className="text-right">{fmt(r.ret)}</td>
+                      <td className="text-right">{fmt(r.ab)}</td>
+                      <td className="text-right font-semibold">{pct(rate(r.ap, r.m))}</td>
                     </tr>
                   ))}
                 </tbody>

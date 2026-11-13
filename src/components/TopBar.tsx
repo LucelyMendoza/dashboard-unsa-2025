@@ -76,6 +76,9 @@ export default function TopBar({
                 <p className="font-serif italic text-[13px] sm:text-[15px] opacity-95 mt-1" style={{ color: '#f7efe6' }}>
                   Rendimiento académico y seguimiento institucional
                 </p>
+                <p className="mt-2 text-[10px] font-semibold tracking-wide" style={{ color: 'var(--dorado)' }}>
+                  Elaborado por: Dirección de Servicios Académicos (DSA)
+                </p>
               </div>
 
               <div className="text-left md:text-right text-[11px] sm:text-xs leading-relaxed px-3 py-2 rounded-xl border" style={{ backgroundColor: 'rgba(250,247,242,0.12)', borderColor: 'rgba(255,255,255,0.18)' }}>
@@ -147,6 +150,9 @@ export default function TopBar({
           <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.12em]" style={{ color: 'var(--texto-sec)' }}>
             Panel institucional · acceso restringido
           </div>
+          <p className="text-[10px] sm:text-[11px] font-semibold" style={{ color: 'var(--granate)' }}>
+            Elaborado por: Dirección de Servicios Académicos (DSA)
+          </p>
           <div className="flex items-center gap-2">
             {adminAction}
             <button

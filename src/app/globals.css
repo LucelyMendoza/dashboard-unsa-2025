@@ -35,3 +35,48 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.academic-table-shell {
+  overflow: auto;
+  border: 1px solid var(--linea);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.academic-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.academic-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.academic-table thead th {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 3px solid var(--dorado);
+  background-color: var(--granate);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.academic-table tbody tr:nth-child(even) {
+  background-color: #faf8f5;
+}
+
+.academic-table tbody tr:hover {
+  background-color: var(--crema);
+}
+
+.academic-table tbody td {
+  border-top: 1px solid #f1eee9;
+  padding: 0.625rem 0.75rem;
+  vertical-align: middle;
+}
