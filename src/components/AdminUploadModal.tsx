@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { parseExcelFile, ExcelParseError } from '@/lib/excelParser';
-import { getImportRowKey, groupImportRows } from '@/lib/import-utils';
+import { getImportRowKey, groupImportRows, IMPORT_API_BATCH_SIZE } from '@/lib/import-utils';
 import { getIdToken } from '@/lib/firebase';
 import type { ImportRow } from '@/lib/excelParser';
 
@@ -31,7 +31,8 @@ interface ValidationError {
 }
 
 type ModalStep = 'idle' | 'reading' | 'preview' | 'confirming' | 'done' | 'error';
-const API_BATCH_SIZE = 1000;
+// Mantiene cada invocación del Worker pequeña; lotes grandes pueden superar
+// el límite de recursos de Cloudflare aunque D1 escriba en sublotes.
 
 function splitIntoBatches<T>(items: T[], size: number) {
   const batches: T[][] = [];
@@ -100,16 +101,18 @@ export default function AdminUploadModal() {
       }
 
       // Analiza en lotes pequeños para que los archivos grandes no excedan los límites del Worker.
-      const token = await getIdToken();
+      let token = await getIdToken();
       if (!token) throw new Error('No hay sesión activa. Por favor, vuelve a iniciar sesión.');
 
       const groups = groupImportRows(result.filasValidas);
       const entries = Array.from(groups.entries());
-      const batches = splitIntoBatches(entries, API_BATCH_SIZE);
+      const batches = splitIntoBatches(entries, IMPORT_API_BATCH_SIZE);
       const existingKeys = new Set<string>();
       const serverPreviews: ImportRow[] = [];
 
       for (let i = 0; i < batches.length; i += 1) {
+        token = await getIdToken();
+        if (!token) throw new Error('La sesión expiró. Vuelve a iniciar sesión y carga el archivo de nuevo.');
         setProgress(`Revisando lote ${i + 1} de ${batches.length}...`);
         const previewRes = await fetch('/api/admin/import', {
           method: 'POST',
@@ -177,7 +180,7 @@ export default function AdminUploadModal() {
     setError('');
 
     try {
-      const token = await getIdToken();
+      let token = await getIdToken();
       if (!token) throw new Error('No hay sesión activa. Por favor, vuelve a iniciar sesión.');
 
       const groups = groupImportRows(allRows);
@@ -205,9 +208,17 @@ export default function AdminUploadModal() {
         if (existingKeySet.has(key)) selectionsToCommit[key] = selectedRow._fila;
       }
 
-      const batches = splitIntoBatches(rowsToCommit, API_BATCH_SIZE);
+      const batches = splitIntoBatches(rowsToCommit, IMPORT_API_BATCH_SIZE);
       let savedRows = 0;
       for (let i = 0; i < batches.length; i += 1) {
+        token = await getIdToken();
+        if (!token) {
+          throw new Error(
+            savedRows
+              ? `La sesión expiró después de guardar ${savedRows} registros. Vuelve a iniciar sesión y carga el mismo archivo para continuar.`
+              : 'La sesión expiró. Vuelve a iniciar sesión y carga el archivo de nuevo.'
+          );
+        }
         setProgress(`Guardando lote ${i + 1} de ${batches.length}...`);
         const batch = batches[i];
         const batchSelections: Record<string, number> = {};
@@ -276,7 +287,7 @@ export default function AdminUploadModal() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="text-[var(--accent)]" size={18} />
-                <h3 className="text-base font-bold text-slate-800">Importar datos académicos</h3>
+                <h3 className="text-base font-bold text-slate-800">Importar datos locales</h3>
               </div>
               <button
                 onClick={closeModal}
@@ -390,7 +401,7 @@ export default function AdminUploadModal() {
                               {first.periodo} · {first.facultad} · {first.escuela} · {first.codigo} · Grupo {first.grupo || '—'}
                             </span>
                             <span className="block text-[10px] text-slate-500">
-                              {group.exists ? 'La clave se repite en el archivo y ya existe en la base de datos.' : 'La clave se repite en el archivo.'}
+                              {group.exists ? 'La clave se repite en el archivo y ya existe en la D1 local.' : 'La clave se repite en el archivo.'}
                             </span>
                             <select
                               value={duplicateSelections[group.key] ?? ''}
@@ -420,7 +431,7 @@ export default function AdminUploadModal() {
                 {existingKeys.length > 0 && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                     <p className="text-xs font-semibold text-amber-900">
-                      {existingKeys.length} registros del archivo ya existen en D1
+                      {existingKeys.length} registros del archivo ya existen en D1 local
                     </p>
                     <label className="mt-2 flex items-start gap-2 text-[10px] text-amber-900">
                       <input
@@ -508,7 +519,7 @@ export default function AdminUploadModal() {
                   <div>
                     <p className="text-xs font-semibold text-emerald-900">Importación completada</p>
                     <p className="text-[10px] text-emerald-800 mt-1">
-                      Se guardaron {summary.nuevos} registros. Recarga el dashboard para ver los cambios.
+                      Se guardaron {summary.nuevos} registros en D1 local. Ejecuta <code>npm run data:build</code> y publica el archivo actualizado en GitHub para reflejar los cambios en producción.
                     </p>
                   </div>
                 </div>

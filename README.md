@@ -1,6 +1,6 @@
 # Panel de Rendimiento Académico — UNSA
 
-Dashboard de rendimiento académico de pregrado (2019–2024) con acceso por rol.
+Dashboard de rendimiento académico de pregrado (2019–2026) con acceso por rol.
 
 ## Cómo correrlo en VS Code
 
@@ -11,50 +11,41 @@ npm run dev
 ```
 
 Abre `http://localhost:3000` → redirige a `/login`.
-La migración prepara una base D1 local vacía y no modifica la base de producción.
-Para ver datos en el dashboard, inicia sesión con una cuenta ADMIN y carga un Excel.
+El dashboard carga un dataset precomputado desde un archivo estático y no consulta
+D1 al abrirse. Para hacer una importación local, aplica las migraciones locales,
+inicia sesión con ADMIN y usa **"Subir Excel"** durante el desarrollo.
 
 El acceso se realiza con Google. Solo pueden entrar los correos autorizados en
-`src/lib/roles.ts`; la carga de datos está disponible únicamente para el rol
-`ADMIN`.
+`src/lib/roles.ts`; la importación local está disponible únicamente para el rol
+`ADMIN` durante el desarrollo.
 
 ## Dar de alta una cuenta/rol nuevo
 
 Editar `src/lib/roles.ts` y agregar una entrada a `ROLE_MAP`. Los nombres de
 `facultad`/`escuela` deben coincidir EXACTAMENTE con los que aparecen en
-`public/data/initialData.json` (columnas `FACULTAD`/`ESCUELA` del Excel origen).
+dataset estático en `public/data/` (columnas `FACULTAD`/`ESCUELA` del Excel origen).
 
-## Actualizar los datos (rol ADMIN)
+## Actualizar los datos publicados
 
-Inicia sesión con un correo ADMIN y usa **"Subir Excel"** en la barra superior
-(en móvil, abre el menú **Menú** para encontrar el botón). El importador reconoce
+La importación web está habilitada solo en desarrollo y guarda en la D1 local.
+No se muestra ni escribe en la base de producción. El importador reconoce
 las cabeceras `PERIODO, FACULTAD, ESCUELA, CODIGO, ASIGNATURA, GRUPOS,
 MATRICULADOS, APROBADOS, DESAPROBADOS, ABANDONOS, RETIROS, APROB 11-13,
 APROB. 14-16, APROB. 17-20, PROMEDIO, DOCENTES` y `AÑO ESTUDIOS`.
 Son obligatorias `PERIODO, ESCUELA, CODIGO, ASIGNATURA, MATRICULADOS, APROBADOS`
 y `DESAPROBADOS`; las demás son opcionales.
 
-Los indicadores del tablero usan los totales `APROBADOS`, `DESAPROBADOS`,
-`ABANDONOS`, `RETIROS` y `MATRICULADOS`. Los tres rangos de aprobados se guardan
-por separado como desglose y no se vuelven a sumar a `APROBADOS`. `AÑO ESTUDIOS`
-también se conserva en D1 para consultas futuras.
+Para publicar los cambios después de importar un Excel:
 
-La clave para detectar duplicados es `PERIODO + FACULTAD + ESCUELA + CODIGO +
-GRUPOS`. El archivo se analiza y guarda en lotes para evitar exceder los límites
-de recursos de Cloudflare. Las filas nuevas se importan automáticamente; para
-claves repetidas dentro del archivo puedes elegir una fila o dejar el grupo
-omitido. Si una clave ya existe en D1, puedes reemplazar los registros existentes
-marcando la opción correspondiente en la vista previa.
+1. En desarrollo, importa el Excel. Los registros quedan en D1 local.
+2. Ejecuta `npm run data:build`. El comando exporta solo la D1 local, usa el
+   mismo constructor del dashboard y genera un JSON versionado en `public/data/`.
+3. Revisa el dataset generado y el cambio en `src/lib/generated-dataset.ts`.
+4. Incluye ambos archivos en un commit y súbelo a GitHub para desplegar.
 
-Si una importación se interrumpe mientras guarda, algunos lotes podrían haberse
-guardado ya. Vuelve a cargar el mismo archivo y, en la vista previa, elige si
-quieres reemplazar las claves que ya aparecen en D1 antes de continuar.
-
-La importación se guarda en la base D1 configurada para el entorno en ejecución.
-En local, la base empieza vacía; al importar desde `localhost`, los datos solo
-se guardan en la D1 local y no alteran producción. Antes de desplegar una versión
-que incluya una migración nueva, aplícala también a producción con
-`npx wrangler d1 migrations apply academic-db-produccion --remote`.
+La aplicación de producción sirve el JSON estático desde Cloudflare y no lee ni
+escribe registros en D1. La URL del archivo incluye su hash; así, cada versión
+usa una ruta nueva y el navegador puede reutilizar la copia en caché.
 
 ## Estructura
 
@@ -62,6 +53,7 @@ que incluya una migración nueva, aplícala también a producción con
 - `src/lib/session.ts` — sesión + alcance de datos por rol
 - `src/lib/data-utils.ts` — cálculos (tasas, semáforo, agrupaciones)
 - `src/lib/excelParser.ts` + `src/lib/recompute.ts` — ingestión de Excel
+- `scripts/generate-static-dataset.mjs` — genera el dataset estático desde D1 local
 - `src/components/` — piezas del dashboard (KPIs, gráficos, tablas, tabs)
 - `src/app/login`, `src/app/dashboard` — páginas
 

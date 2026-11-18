@@ -113,7 +113,7 @@ const PERIODO_RE = /^\d{4}-[A-Za-z0-9]+$/;
 /**
  * Lee el Excel en el navegador y devuelve filas normalizadas + errores de
  * validación. NO escribe nada — la persistencia/dedup ocurre en el backend
- * (/api/admin/import) contra D1. Esto habilita el paso de previsualización.
+ * (/api/admin/import) contra la D1 local durante el desarrollo.
  */
 export function parseExcelFile(fileBuffer: ArrayBuffer): ParseResult {
   const workbook = XLSX.read(fileBuffer, { type: 'array' });

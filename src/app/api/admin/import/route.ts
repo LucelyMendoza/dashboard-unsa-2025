@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { requireAdmin, AuthError } from '@/lib/auth-verify';
-import { getImportRowKey, groupImportRows } from '@/lib/import-utils';
+import { getImportRowKey, groupImportRows, IMPORT_API_BATCH_SIZE } from '@/lib/import-utils';
 import type { ImportRow } from '@/lib/excelParser';
 
 interface ImportBody {
@@ -26,10 +26,9 @@ interface DuplicateGroup {
 
 type AppEnv = CloudflareEnv & {
   DB?: D1Database;
-  DB_REMOTE?: D1Database;
 };
 
-const BATCH_SIZE = 50; // filas por sentencia D1.batch()
+const D1_BATCH_SIZE = 50;
 
 async function findExistingKeys(db: D1Database, rows: ImportRow[]) {
   const rowsByKey = new Map<string, ImportRow>();
@@ -75,6 +74,13 @@ function getDuplicateGroups(rows: ImportRow[], existingKeys: Set<string>): Dupli
 }
 
 export async function POST(request: Request) {
+  if (process.env.NODE_ENV === 'production') {
+    return Response.json(
+      { error: 'La importación web está deshabilitada. Actualiza el dataset estático desde el entorno local.' },
+      { status: 410 }
+    );
+  }
+
   let admin: { email: string };
   try {
     admin = await requireAdmin(request);
@@ -94,6 +100,12 @@ export async function POST(request: Request) {
   if (!Array.isArray(rows) || !rows.length) {
     return Response.json({ error: 'No se recibieron filas para procesar.' }, { status: 400 });
   }
+  if (rows.length > IMPORT_API_BATCH_SIZE) {
+    return Response.json(
+      { error: `Cada solicitud puede procesar como máximo ${IMPORT_API_BATCH_SIZE} filas.` },
+      { status: 413 }
+    );
+  }
   if (mode !== 'preview' && mode !== 'commit' && mode !== 'replace') {
     return Response.json({ error: "mode debe ser 'preview', 'commit' o 'replace'." }, { status: 400 });
   }
@@ -101,7 +113,6 @@ export async function POST(request: Request) {
   const { env } = getCloudflareContext();
   const appEnv = env as AppEnv;
   const db = appEnv.DB;
-  const remoteDb = appEnv.DB_REMOTE;
   if (!db) {
     return Response.json({ error: 'La base de datos D1 (binding DB) no está configurada en este entorno.' }, { status: 500 });
   }
@@ -157,8 +168,8 @@ export async function POST(request: Request) {
   // Inserta o reemplaza en lotes; cada grupo duplicado se procesa como una sola fila.
   const insertInto = (targetDb: D1Database) =>
     (async () => {
-      for (let i = 0; i < nuevas.length; i += BATCH_SIZE) {
-        const chunk = nuevas.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < nuevas.length; i += D1_BATCH_SIZE) {
+        const chunk = nuevas.slice(i, i + D1_BATCH_SIZE);
         const stmts = chunk.map((r) =>
           targetDb
             .prepare(
@@ -197,15 +208,6 @@ export async function POST(request: Request) {
     })();
 
   await insertInto(db);
-  let remoteWarning = '';
-  if (remoteDb && remoteDb !== db) {
-    try {
-      await insertInto(remoteDb);
-    } catch (err) {
-      remoteWarning = err instanceof Error ? err.message : 'No se pudo sincronizar con la base remota.';
-      console.warn('Remote D1 sync failed:', remoteWarning);
-    }
-  }
 
   await db
     .prepare(
@@ -214,5 +216,5 @@ export async function POST(request: Request) {
     .bind(admin.email, sourceFile ?? '', summary.totalFilas, summary.nuevos, summary.duplicados, 0)
     .run();
 
-  return Response.json({ summary, remoteWarning: remoteWarning || undefined });
+  return Response.json({ summary });
 }

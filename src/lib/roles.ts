@@ -27,7 +27,7 @@ export const ROLE_MAP: Record<string, Omit<UserSession, 'email'>> = {
 
   // Decanos: ve Resumen + Escuelas de su facultad (filtro de facultad bloqueado).
   // Los valores de `facultad` deben coincidir EXACTAMENTE con los del dataset
-  // (public/data/initialData.json) para que el filtro funcione.
+  // (public/data/dashboard-<hash>.json) para que el filtro funcione.
   'fad@unsa.edu.pe':        { name: 'Decano', role: 'DECANO', facultad: 'ADMINISTRACIÓN' },
   'fagronomia@unsa.edu.pe': { name: 'Decano', role: 'DECANO', facultad: 'AGRONOMÍA' },
   'fau@unsa.edu.pe':        { name: 'Decano', role: 'DECANO', facultad: 'ARQUITECTURA Y URBANISMO' },
@@ -49,7 +49,7 @@ export const ROLE_MAP: Record<string, Omit<UserSession, 'email'>> = {
 
   // Director de Escuela: fijado a su facultad y escuela (sólo ve Asignaturas + Docentes).
   // Los valores de `facultad` y `escuela` deben coincidir EXACTAMENTE con los del
-  // dataset (public/data/initialData.json), incluidos acentos y caracteres especiales.
+  // dataset estático, incluidos acentos y caracteres especiales.
   'administracion@unsa.edu.pe':      { name: 'Director de Escuela', role: 'DIRECTOR', facultad: 'ADMINISTRACIÓN', escuela: 'ADMINISTRACIÓN' },
   'alimentaria@unsa.edu.pe':         { name: 'Director de Escuela', role: 'DIRECTOR', facultad: 'INGENIERÍA DE PROCESOS', escuela: 'INGENIERÍA DE INDUSTRIAS ALIMENTARIAS' },
   'ambiental@unsa.edu.pe':           { name: 'Director de Escuela', role: 'DIRECTOR', facultad: 'INGENIERÍA DE PROCESOS', escuela: 'INGENIERÍA AMBIENTAL' },

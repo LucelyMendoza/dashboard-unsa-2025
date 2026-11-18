@@ -3,11 +3,7 @@ import { recomputeDerived } from '@/lib/recompute';
 import type { ImportRow } from '@/lib/excelParser';
 
 /**
- * Arma un DashboardDataset (mismo shape que antes vivía en
- * public/data/initialData.json) a partir de filas planas — ya sea las que
- * vienen de D1 (GET /api/dataset) o las recién parseadas de un Excel para
- * previsualización. Reemplaza la mutación manual que antes hacía
- * excelParser.ts directamente sobre el dataset.
+ * Arma el DashboardDataset estático que se genera desde las filas de D1 local.
  */
 export function buildDataset(rows: ImportRow[]): DashboardDataset {
   const fe: Record<string, string[]> = {};

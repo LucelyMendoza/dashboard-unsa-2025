@@ -10,6 +10,7 @@ import { getAllowedTabs, canViewTab } from '@/lib/roles';
 import type { DashboardTab } from '@/types/dashboard';
 import { DEFAULT_FILTERS, FilterState, filterAgg, filterScorecard, groupBy } from '@/lib/data-utils';
 import { recomputeDerived } from '@/lib/recompute';
+import { STATIC_DATASET_URL } from '@/lib/generated-dataset';
 import AdminUploadModal from '@/components/AdminUploadModal';
 import TopBar from '@/components/TopBar';
 import FiltersBar from '@/components/FiltersBar';
@@ -48,6 +49,7 @@ export default function DashboardPage() {
   const [session] = useState<UserSession | null>(() => getSession());
   const [dataset, setDataset] = useState<DashboardDataset | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [datasetRetry, setDatasetRetry] = useState(0);
   // Arranca en la primera pestaña permitida para el rol (cada rol ve sólo las suyas).
   const [tab, setTab] = useState<DashboardTab>(() => {
     const s = getSession();
@@ -68,19 +70,47 @@ export default function DashboardPage() {
     if (!session) router.replace('/login');
   }, [session, router]);
 
-  // 2. Cargar el dataset desde la API (reemplaza initialData.json estático)
+  // El dataset precomputado se sirve como archivo estático desde Cloudflare.
   useEffect(() => {
-    fetch('/api/dataset')
-      .then((res) => {
-        if (!res.ok) throw new Error(`API error ${res.status}`);
-        return res.json() as Promise<DashboardDataset>;
-      })
-      .then((data: DashboardDataset) => setDataset(data)) // Ya viene computado desde la API
-      .catch((err) => {
-        console.error(err);
-        setErrorMsg('No se pudo cargar el dataset. Verifica que la API esté disponible.');
-      });
-  }, []);
+    const controller = new AbortController();
+    let active = true;
+
+    const loadDataset = async () => {
+      setErrorMsg('');
+      try {
+        const res = await fetch(STATIC_DATASET_URL, { signal: controller.signal, cache: 'force-cache' });
+        if (!res.ok) {
+          const responseText = await res.text();
+          let message = `El archivo de datos respondió con error ${res.status}.`;
+          try {
+            const body = JSON.parse(responseText) as { error?: string };
+            if (body.error) message = body.error;
+          } catch {
+            if (responseText) message = `${message} ${responseText.slice(0, 300)}`;
+          }
+          if (active) setErrorMsg(`No se pudieron cargar los datos. ${message}`);
+          return;
+        }
+        const data = (await res.json()) as DashboardDataset;
+        if (active) setDataset(data);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        if (active) {
+          setErrorMsg(
+            err instanceof Error
+              ? `No se pudieron cargar los datos. ${err.message}`
+              : 'No se pudieron cargar los datos. Comprueba tu conexión e inténtalo de nuevo.'
+          );
+        }
+      }
+    };
+
+    void loadDataset();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [datasetRetry]);
 
   const handleLogout = async () => {
     // 1. Borra la sesión local (localStorage).
@@ -96,11 +126,6 @@ export default function DashboardPage() {
     }
     router.replace('/login');
   };
-
-  // Nota: handleExcelUpload ya no es necesario aquí. La importación ocurre
-  // íntegramente en AdminUploadModal → /api/admin/import (backend).
-  // El dashboard se actualiza automáticamente al recargar la página después
-  // de una importación exitosa, que trae los nuevos datos de /api/dataset.
 
   const scope = session ? getRoleScope(session) : null;
   // Pestañas que este rol puede ver (las demás se ocultan de la barra).
@@ -141,7 +166,17 @@ export default function DashboardPage() {
   if (errorMsg) {
     return (
       <div className="p-8 text-center text-red-600 bg-red-50 rounded-lg max-w-lg mx-auto mt-10 border border-red-200">
-        <p className="font-bold text-sm">⚠️ {errorMsg}</p>
+        <p className="font-bold text-sm">{errorMsg}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setDataset(null);
+            setDatasetRetry((attempt) => attempt + 1);
+          }}
+          className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
@@ -172,7 +207,11 @@ export default function DashboardPage() {
         mobileOpen={mobileMenuOpen}
         onToggleMobile={() => setMobileMenuOpen((v) => !v)}
         mobileFilters={mobileFilters}
-        adminAction={session.role === 'ADMIN' ? <AdminUploadModal /> : undefined}
+        adminAction={
+          session.role === 'ADMIN' && process.env.NODE_ENV === 'development'
+            ? <AdminUploadModal />
+            : undefined
+        }
       />
 
       <div className="hidden md:block">

@@ -1,5 +1,7 @@
 import type { ImportRow } from '@/lib/excelParser';
 
+export const IMPORT_API_BATCH_SIZE = 250;
+
 export function getImportRowKey(row: Pick<ImportRow, 'periodo' | 'facultad' | 'escuela' | 'codigo' | 'grupo'>) {
   return JSON.stringify([row.periodo, row.facultad, row.escuela, row.codigo, row.grupo]);
 }

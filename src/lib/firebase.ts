@@ -8,12 +8,10 @@ export const firebaseApp = app;
 export const firebaseAuth = getAuth(app);
 
 /**
- * Token que el backend (/api/admin/import) verifica en `requireAdmin` — sin
- * esto, el rol ADMIN solo existía en localStorage y era falsificable desde
- * la consola del navegador.
+ * Token que el importador local (/api/admin/import) verifica en `requireAdmin`.
  */
-export async function getIdToken(): Promise<string | null> {
+export async function getIdToken(forceRefresh = false): Promise<string | null> {
   const user = firebaseAuth.currentUser;
   if (!user) return null;
-  return user.getIdToken();
+  return user.getIdToken(forceRefresh);
 }
