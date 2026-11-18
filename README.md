@@ -70,5 +70,9 @@ del repositorio, `npm run cf:build` como comando de build y
 nuevo en `main` debe crear un build; confirma en Deployments que el commit
 publicado sea el más reciente.
 
+Workers Builds debe ejecutar `npm run cf:build`, no solo `npm run build`, para
+generar el Worker de OpenNext. La caché incremental usa Workers Static Assets
+de solo lectura; este proyecto no requiere un bucket R2 para la caché.
+
 Para desplegar manualmente desde un entorno autenticado con Wrangler, ejecuta
 `npm run cf:deploy`.

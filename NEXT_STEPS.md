@@ -96,6 +96,11 @@ al repositorio GitHub desde **Settings → Builds** y configura:
 - Build command: `npm run cf:build`
 - Deploy command: `npx opennextjs-cloudflare deploy`
 
+No uses `npm run build` como único comando de build: compila Next.js, pero no
+genera el Worker de OpenNext que Cloudflare debe desplegar. La caché
+incremental está configurada como Workers Static Assets de solo lectura y no
+requiere crear un bucket R2.
+
 Después de subir un commit, verifica en **Deployments / Build history** que el
 build use el commit esperado y haya terminado correctamente. Para desplegar
 manualmente desde un entorno autenticado con Wrangler, ejecuta
