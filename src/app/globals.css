@@ -41,6 +41,7 @@ body {
   border: 1px solid var(--linea);
   border-radius: 0.75rem;
   background: #fff;
+  box-shadow: 0 1px 3px rgb(30 41 59 / 5%);
 }
 
 .academic-table {
@@ -56,27 +57,51 @@ body {
 }
 
 .academic-table thead th {
-  padding: 0.7rem 0.75rem;
-  border-bottom: 3px solid var(--dorado);
+  padding: 0.8rem 0.875rem;
+  border-bottom: 2px solid var(--dorado);
   background-color: var(--granate);
   color: #fff;
-  font-size: 0.625rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .academic-table tbody tr:nth-child(even) {
-  background-color: #faf8f5;
-}
-
-.academic-table tbody tr:hover {
-  background-color: var(--crema);
+  background-color: #faf9f7;
 }
 
 .academic-table tbody td {
-  border-top: 1px solid #f1eee9;
-  padding: 0.625rem 0.75rem;
+  border-top: 1px solid #eeeae5;
+  padding: 0.7rem 0.875rem;
   vertical-align: middle;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.academic-table tbody tr {
+  transition: background-color 140ms ease;
+}
+
+.academic-table tbody tr:hover {
+  background-color: #f4eee8;
+}
+
+.academic-table tbody td:first-child {
+  color: #334155;
+}
+
+.academic-table tfoot th,
+.academic-table tfoot td {
+  border-top: 1px solid #e2ddd6;
+  background: #f8f6f3;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .academic-table thead th,
+  .academic-table tbody td {
+    padding: 0.625rem 0.75rem;
+  }
 }

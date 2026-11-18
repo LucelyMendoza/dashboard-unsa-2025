@@ -9,6 +9,7 @@ type MetricKey = 'apr' | 'des' | 'ret' | 'abn';
 type RateBand = 'low' | 'medium' | 'high';
 
 const PAGE_SIZES = [25, 50, 100];
+
 const METRICS: Record<MetricKey, { label: string; accent: string; bands: Record<RateBand, string> }> = {
   apr: {
     label: 'Aprobados',
