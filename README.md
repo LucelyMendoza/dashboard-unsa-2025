@@ -57,7 +57,18 @@ usa una ruta nueva y el navegador puede reutilizar la copia en caché.
 - `src/components/` — piezas del dashboard (KPIs, gráficos, tablas, tabs)
 - `src/app/login`, `src/app/dashboard` — páginas
 
-## Despliegue
+## Despliegue en Cloudflare Workers
 
-El proyecto ya incluye `@opennextjs/cloudflare` y `wrangler` en devDependencies,
-para desplegar en Cloudflare Pages/Workers cuando quieras.
+La configuración única de Wrangler es `wrangler.jsonc`; no se debe crear otro
+`wrangler.toml`. El Worker configurado se llama `dashboard-unsa-produccion`.
+
+Para desplegar automáticamente desde GitHub, conecta el Worker existente al
+repositorio `LucelyMendoza/dashboard-unsa-2025` desde **Workers & Pages →
+dashboard-unsa-produccion → Settings → Builds**. Usa la rama `main`, la raíz
+del repositorio, `npm run cf:build` como comando de build y
+`npx opennextjs-cloudflare deploy` como comando de despliegue. Cada commit
+nuevo en `main` debe crear un build; confirma en Deployments que el commit
+publicado sea el más reciente.
+
+Para desplegar manualmente desde un entorno autenticado con Wrangler, ejecuta
+`npm run cf:deploy`.

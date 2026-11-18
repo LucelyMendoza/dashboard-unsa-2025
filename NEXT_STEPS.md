@@ -3,27 +3,14 @@
 ## Setup Local (prerrequisitos)
 
 ```bash
-# 1. Instalar dependencias (si no está hecho)
 npm install
-
-# 2. Instalar wrangler CLI
-npm install -g wrangler
-
-# 3. Autenticarse en Cloudflare
-wrangler login
-
-# 4. Crear la BD D1 local para desarrollo
-wrangler d1 create academic-db-local
-
-# 5. Aplicar la migración
-wrangler d1 execute academic-db-local --file=./migrations/0001_init.sql
-
-# 6. Seedear BD con datos de Educación 2021+ (ver sección "Seedeo" más abajo)
-
-# 7. Correr en desarrollo
+npx wrangler d1 migrations apply academic-db-produccion --local
 npm run dev
-# Visita http://localhost:3000 → login → dashboard
 ```
+
+El flag `--local` aplica las migraciones a la base local; no requiere iniciar
+sesión ni crear o modificar una base D1 remota. El dashboard lee el JSON
+estático, no D1.
 
 ## Verificar Compilación TypeScript
 
@@ -36,60 +23,13 @@ npx tsc --noEmit
 # - "jose" no existe → npm install jose
 ```
 
-## Seedeo de BD (Educación 2021+)
+## Actualizar el dataset publicado
 
-Actualmente, `academic_records` está vacía. Para validar, seedea con datos reales de los Excel:
-
-### Opción A: Script Python (lo más rápido)
-```python
-# seed_education_2021.py
-import openpyxl
-import sqlite3
-
-# Abrir el Excel "base_final_-_aprob_desaprob_ret_aband_2019-2024__1_.xlsx"
-wb = openpyxl.load_workbook('/ruta/al/archivo.xlsx')
-ws = wb['Hoja2']
-
-# Conectar a la BD local
-conn = sqlite3.connect('.wrangler/state/v3/d1/database_local.db')  # ruta varía
-cur = conn.cursor()
-
-# Iterar rows y filtrar escuela = "EDUCACIÓN" + year >= 2021
-for row in ws.iter_rows(min_row=2, values_only=True):
-    periodo, escuela, nro, codigo, asignatura, grupos, mat, apr, des, abn, ret, _, _, _, prom = row
-    
-    if not periodo or not escuela or escuela.upper() != 'EDUCACIÓN':
-        continue
-    
-    year = int(str(periodo)[:4])
-    if year < 2021:
-        continue
-    
-    # Insertar
-    cur.execute('''
-        INSERT OR IGNORE INTO academic_records 
-        (periodo, anio, facultad, escuela, codigo, asignatura, grupo, docente, 
-         matriculados, aprobados, desaprobados, abandonos, retiros, promedio, source_file)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        periodo, year, 'CIENCIAS DE LA EDUCACIÓN', escuela, codigo, asignatura, grupos or '',
-        '(sin especificar)', mat or 0, apr or 0, des or 0, abn or 0, ret or 0, prom or 0,
-        'base_final_2019-2024.xlsx'
-    ))
-
-conn.commit()
-conn.close()
-print("Seedeo completado")
-```
-
-### Opción B: Usar la propia API
-Una vez que el backend está up, cargar a través de la UI (`AdminUploadModal`):
-1. Preparar un Excel filtrado (solo Educación 2021+)
-2. Entrar como ADMIN
-3. Click en "Subir Excel"
-4. Ver preview → confirmar → done
-
-**Nota**: Para esto necesita acceso a Firebase y Google Auth, más complejo en local.
+1. Ejecuta la aplicación en desarrollo e importa el Excel en la D1 local.
+2. Ejecuta `npm run data:build` para generar el JSON estático desde esa base.
+3. Revisa el archivo JSON generado y `src/lib/generated-dataset.ts`.
+4. Sube esos cambios a la rama `main`; Cloudflare Workers Builds debe desplegar
+   el commit. No importes los datos a la D1 remota.
 
 ## Testing Manual
 
@@ -100,10 +40,10 @@ npm run dev
 # Terminal 2: Tests HTTP
 # 1. Login en http://localhost:3000 → conseguir token Firebase en DevTools
 
-# 2. Probar GET /api/dataset (públicо, sin auth)
-curl http://localhost:3000/api/dataset | jq .
+# 2. Probar el JSON estático indicado en src/lib/generated-dataset.ts
+curl "http://localhost:3000/data/ARCHIVO_VERSIONADO.json"
 
-# 3. Probar POST /api/admin/import (requiere token + ADMIN role)
+# 3. La importación web local requiere token + rol ADMIN
 curl -X POST http://localhost:3000/api/admin/import \
   -H "Authorization: Bearer <TU_TOKEN>" \
   -H "Content-Type: application/json" \
@@ -117,13 +57,13 @@ curl -X POST http://localhost:3000/api/admin/import \
 ## Verificaciones de Funcionalidad
 
 - [ ] **Login**: Google Auth funciona, rol ADMIN se asigna correctamente
-- [ ] **Dataset inicial**: Dashboard carga datos desde `/api/dataset` (no JSON estático)
+- [ ] **Dataset**: Dashboard carga el JSON versionado desde `/data/` (no consulta D1)
 - [ ] **Modal de upload**:
   - [ ] Botón "Subir Excel" visible solo para ADMIN
   - [ ] Seleccionar un Excel → valida cabeceras → muestra preview
   - [ ] Resumen (nuevos/duplicados/errores) es correcto
   - [ ] Confirmar → se llama a `/api/admin/import?mode=commit`
-- [ ] **Post-importación**: Dashboard muestra datos nuevos sin recargar (o recarga la página y trae cambios)
+- [ ] **Post-importación**: ejecutar `npm run data:build` y verificar el JSON generado antes de publicar
 - [ ] **Dedup**: Cargar dos veces el mismo Excel → duplicados = 0 en segunda pasada
 - [ ] **Filtros**: Filtro de facultad/escuela/año/período sigue funcionando
 - [ ] **Gráficos/Tablas**: KPI, scorecard, heatmap reflejan correctamente los datos
@@ -133,10 +73,9 @@ curl -X POST http://localhost:3000/api/admin/import \
 ### "D1Database is not defined"
 → Asegúrate que `@opennextjs/cloudflare` está instalado y `opennextjs.config.ts` (si existe) tiene la configuración correcta.
 
-### "/api/dataset" devuelve 404
-→ Las rutas en Next.js App Router están bajo `src/app/api/`. Verifica que existen:
-  - `src/app/api/dataset/route.ts`
-  - `src/app/api/admin/import/route.ts`
+### El dashboard no carga el dataset estático
+→ Verifica que la URL de `src/lib/generated-dataset.ts` corresponda a un archivo
+  existente en `public/data/`; luego ejecuta `npm run data:build`.
 
 ### "jose is not a module"
 → Instalar: `npm install jose`
@@ -144,34 +83,29 @@ curl -X POST http://localhost:3000/api/admin/import \
 ### Token no se valida en servidor
 → Verifica que `FIREBASE_CONFIG.projectId` es correcto en `src/lib/firebase-config.ts`.
 
-## Deploy a Cloudflare (después de validar en local)
+## Deploy a Cloudflare Workers
 
-```bash
-# 1. Crear la BD en Cloudflare Pages
-wrangler d1 create academic-db
+El proyecto usa OpenNext y la configuración `wrangler.jsonc`. No sigas las
+instrucciones antiguas de Cloudflare Pages/D1 ni crees un `wrangler.toml`.
 
-# 2. Anotar el ID devuelto y actualizar wrangler.toml
+Para despliegues automáticos, conecta el Worker `dashboard-unsa-produccion`
+al repositorio GitHub desde **Settings → Builds** y configura:
 
-# 3. Ejecutar migración en prod
-wrangler d1 execute academic-db --file=./migrations/0001_init.sql
+- Rama: `main`
+- Directorio raíz: raíz del repositorio
+- Build command: `npm run cf:build`
+- Deploy command: `npx opennextjs-cloudflare deploy`
 
-# 4. Seedear (con Script Python o upload manual)
-
-# 5. Deploy
-npm run build && wrangler pages deploy out/
-
-# 6. Verificar en https://tu-proyecto.pages.dev
-```
+Después de subir un commit, verifica en **Deployments / Build history** que el
+build use el commit esperado y haya terminado correctamente. Para desplegar
+manualmente desde un entorno autenticado con Wrangler, ejecuta
+`npm run cf:deploy`.
 
 ## Expansión a toda UNSA (post-MVP)
 
-Una vez que el MVP de Educación 2021+ esté validado, expandir es trivial:
-
-1. Cambiar filtro en seed script: `if escuela.upper() == 'EDUCACIÓN'` → quitar (acepta toda)
-2. Cambiar rango de años: `if year < 2021` → `if year < 2019` (o lo que sea)
-3. Re-seedear BD o dejar que admins vayan cargando incrementalmente vía UI
-
-El código no requiere cambios — el sistema ya es genérico.
+Para publicar una cobertura mayor, importa el nuevo Excel en la D1 local,
+regenera el JSON con `npm run data:build`, revisa los cambios y publícalos desde
+GitHub. La D1 de producción no forma parte del flujo de publicación.
 
 ---
 

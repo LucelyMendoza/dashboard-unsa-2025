@@ -1,5 +1,9 @@
 # Diagnóstico y Plan de Implementación — Importación Excel con D1
 
+> Nota: este es un plan histórico de la implementación inicial basada en
+> consultas dinámicas a D1. No es la guía operativa actual; el dashboard usa
+> un JSON estático y el despliegue actual está documentado en `README.md`.
+
 ## Estado Actual (Before)
 
 ### Fuente de datos
@@ -151,7 +155,7 @@ CREATE TABLE import_log (
 11. ✅ Remover importes innecesarios en dashboard/page.tsx
 
 ### Fase 3: Validación + Deploy
-12. **Crear `wrangler.toml`** con binding de D1 (`binding = "DB"`)
+12. **Configurar `wrangler.jsonc`** con el binding de D1 (`binding = "DB"`)
 13. **Seedear D1** con datos de EDUCACIÓN 2021+ (de los Excel proporcionados)
 14. **Testing local** (npm run dev + D1 local via `wrangler`)
 15. **Testing en Cloudflare** (deploy a staging)

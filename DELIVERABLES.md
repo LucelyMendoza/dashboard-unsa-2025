@@ -4,6 +4,9 @@
 **Proyecto**: Dashboard Académico UNSA — Refactor Excel + Persistencia  
 **Alcance MVP**: Educación (2021–2025)
 
+> Este inventario conserva información de la implementación inicial. Para el
+> flujo y los archivos vigentes, sigue `README.md`.
+
 ---
 
 ## 📋 Resumen Ejecutivo
@@ -49,7 +52,7 @@ migrations/
 └── 0001_init.sql                  # Schema D1 (academic_records + import_log)
 
 Configuración:
-├── wrangler.toml                  # Config Cloudflare Workers/D1
+├── wrangler.jsonc                 # Config Cloudflare Workers/OpenNext
 ├── IMPLEMENTATION_PLAN.md         # Diagnóstico + arquitectura detallada
 ├── NEXT_STEPS.md                  # Checklist setup local + deploy
 ├── API_REFERENCE.md               # Ejemplos request/response de APIs
@@ -70,28 +73,14 @@ src/lib/roles.ts                  # Sin cambios (sigue siendo fuente de verdad)
 ## 🚀 Quick Start (Local)
 
 ```bash
-# 1. Setup
 npm install
-npm install -g wrangler
-
-# 2. Autenticación Cloudflare
-wrangler login
-
-# 3. Crear BD local
-wrangler d1 create academic-db-local
-
-# 4. Migración
-wrangler d1 execute academic-db-local --file=./migrations/0001_init.sql
-
-# 5. Seedeo (ver NEXT_STEPS.md para detalles)
-# → Ejecutar script Python o cargar vía UI
-
-# 6. Desarrollo
+npx wrangler d1 migrations apply academic-db-produccion --local
 npm run dev
-# Visita http://localhost:3000 → login → dashboard
 ```
 
-**Documentación detallada**: Ver `NEXT_STEPS.md`
+La opción `--local` evita crear o modificar una base remota. Para publicar
+datos actualizados, sigue el flujo de `README.md`; no se requiere importar
+datos en D1 de producción.
 
 ---
 
@@ -200,12 +189,12 @@ Según tu spec original (21 puntos):
 
 ## 🎯 Próximos Pasos Inmediatos
 
-1. **Setup local** (5 min): Ver NEXT_STEPS.md
-2. **Seedeo BD** (15 min): Ejecutar script Python con Educación 2021+
-3. **Testing** (30 min): Cargar Excel → ver preview → confirmar → verificar dedup
-4. **Deploy Cloudflare** (10 min): `wrangler pages deploy`
+1. Importar el Excel en la D1 local desde el entorno de desarrollo.
+2. Ejecutar `npm run data:build` para generar el dataset estático.
+3. Revisar el JSON y `src/lib/generated-dataset.ts`, y subir los cambios a `main`.
+4. Verificar que Cloudflare Workers Builds publique ese commit correctamente.
 
-**Tiempo total estimado**: ~1 hora
+No se requiere sembrar ni consultar la D1 de producción para actualizar el dashboard.
 
 ---
 
