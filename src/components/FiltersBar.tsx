@@ -12,7 +12,7 @@ interface Props {
 }
 
 const selectCls =
-  'w-full text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400';
+  'dashboard-control w-full text-xs border rounded-lg px-2.5 py-2 disabled:bg-slate-100 disabled:text-slate-400';
 const labelCls = 'block text-[10px] font-bold uppercase text-slate-500 mb-1 tracking-wide';
 
 export default function FiltersBar({ dataset, filters, onChange, scope }: Props) {
@@ -27,7 +27,7 @@ export default function FiltersBar({ dataset, filters, onChange, scope }: Props)
     filters.anio === 'ALL' ? dataset.ps : dataset.ps.filter((p) => p.startsWith(filters.anio));
 
   return (
-    <section className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-sm">
+    <section className="dashboard-panel p-3.5 sm:p-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div>
           <label className={labelCls}>Facultad</label>
@@ -111,13 +111,13 @@ export default function FiltersBar({ dataset, filters, onChange, scope }: Props)
 
         <div>
           <label className={labelCls}>Agrupación</label>
-          <div className="inline-flex w-full border border-slate-200 rounded-lg overflow-hidden">
+          <div className="inline-flex w-full border rounded-lg overflow-hidden" style={{ borderColor: 'var(--linea)' }}>
             {(['sem', 'anio'] as const).map((g) => (
               <button
                 key={g}
                 onClick={() => onChange({ ...filters, agrupacion: g })}
                 className={`flex-1 py-2 text-[11px] font-medium ${
-                  filters.agrupacion === g ? 'bg-[var(--accent)] text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
+                  filters.agrupacion === g ? 'bg-[var(--granate)] text-white' : 'bg-[var(--papel)] text-slate-500 hover:bg-[var(--crema)]'
                 }`}
               >
                 {g === 'sem' ? 'Semestral' : 'Anual'}

@@ -165,7 +165,7 @@ export default function DashboardPage() {
 
   if (errorMsg) {
     return (
-      <div className="p-8 text-center text-red-600 bg-red-50 rounded-lg max-w-lg mx-auto mt-10 border border-red-200">
+      <div className="p-8 text-center text-[var(--rojo)] bg-[var(--rojo-bg)] rounded-lg max-w-lg mx-auto mt-10 border border-[var(--linea)]">
         <p className="font-bold text-sm">{errorMsg}</p>
         <button
           type="button"
@@ -173,7 +173,7 @@ export default function DashboardPage() {
             setDataset(null);
             setDatasetRetry((attempt) => attempt + 1);
           }}
-          className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+          className="mt-3 rounded-lg bg-[var(--granate)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--granate-oscuro)]"
         >
           Reintentar
         </button>
@@ -228,11 +228,11 @@ export default function DashboardPage() {
       />
 
       {currentTabAllowed && tab === 'resumen' && (
-        <div className="space-y-5">
+        <div className="view-enter space-y-5">
           <KpiGrid groups={groups} />
 
           <div className="grid grid-cols-1 gap-4">
-            <div className="bg-white border border-slate-200 rounded-xl p-4 w-full">
+            <div className="dashboard-panel p-3 sm:p-4 w-full">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-[var(--ink)]">Evolución de Tasas</h3>
                 <span className="text-[11px] text-slate-400">
@@ -245,7 +245,7 @@ export default function DashboardPage() {
                 <select
                   value={filters.indicador}
                   onChange={(e) => setFilters({ ...filters, indicador: e.target.value as typeof filters.indicador })}
-                  className="text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-slate-50"
+                  className="dashboard-control text-xs border rounded-lg px-2.5 py-2"
                 >
                   <option value="apr">Aprobados</option>
                   <option value="des">Desaprobados</option>
@@ -272,14 +272,14 @@ export default function DashboardPage() {
       )}
 
       {currentTabAllowed && tab === 'escuelas' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <div className="view-enter dashboard-panel p-3 sm:p-4">
           <h3 className="text-sm font-bold text-[var(--ink)] mb-3">Scorecard por escuela</h3>
           <SchoolScorecard rows={scorecardRows} />
         </div>
       )}
 
       {currentTabAllowed && tab === 'asignaturas' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <div className="view-enter dashboard-panel p-3 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
             <h3 className="text-sm font-bold text-[var(--ink)]">Resultados por asignatura y periodo</h3>
             <div className="flex items-center gap-2">
@@ -287,7 +287,7 @@ export default function DashboardPage() {
               <select
                 value={subjectMetric}
                 onChange={(e) => setSubjectMetric(e.target.value as typeof subjectMetric)}
-                className="text-xs border border-slate-200 rounded-lg px-2.5 py-2 bg-slate-50"
+                className="dashboard-control text-xs border rounded-lg px-2.5 py-2"
               >
                 <option value="apr">Aprobados</option>
                 <option value="des">Desaprobados</option>
@@ -301,7 +301,7 @@ export default function DashboardPage() {
       )}
 
       {currentTabAllowed && tab === 'docentes' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <div className="view-enter dashboard-panel p-3 sm:p-4">
           <h3 className="text-sm font-bold text-[var(--ink)] mb-3">Buscador de docentes</h3>
           <TeacherSearch dataset={viewDataset ?? dataset} filters={filters} />
         </div>

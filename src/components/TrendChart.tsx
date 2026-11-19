@@ -4,6 +4,8 @@ import React from 'react';
 import { Line } from 'react-chartjs-2';
 import '@/lib/chart-setup';
 import { rate } from '@/lib/data-utils';
+import { INDICATOR_CHART_COLORS } from '@/lib/chart-colors';
+import { getChartAnimationDuration } from '@/lib/chart-motion';
 import type { GroupedTotals, FilterState } from '@/lib/data-utils';
 
 interface Props {
@@ -11,23 +13,22 @@ interface Props {
   indicador: FilterState['indicador'];
 }
 
-const COLORS = { apr: '#2563eb', des: '#d97706', ret: '#7A02FA', abn: '#FA0202' };
-
 export default function TrendChart({ groups, indicador }: Props) {
   const labels = groups.map((g) => g.k);
+  const COLORS = INDICATOR_CHART_COLORS;
 
   let datasets;
   if (indicador === 'all') {
     datasets = [
-      { label: 'Aprobados', data: groups.map((g) => rate(g.a, g.m)), borderColor: COLORS.apr, backgroundColor: COLORS.apr + '22', fill: false, tension: 0.3, pointRadius: 3, borderWidth: 2 },
-      { label: 'Desaprobados', data: groups.map((g) => rate(g.d, g.m)), borderColor: COLORS.des, backgroundColor: COLORS.des + '22', fill: false, tension: 0.3, pointRadius: 3, borderWidth: 2 },
-      { label: 'Retiro', data: groups.map((g) => rate(g.r, g.m)), borderColor: COLORS.ret, backgroundColor: COLORS.ret + '22', fill: false, tension: 0.3, pointRadius: 3, borderWidth: 2 },
-      { label: 'Abandono', data: groups.map((g) => rate(g.b, g.m)), borderColor: COLORS.abn, backgroundColor: COLORS.abn + '22', fill: false, tension: 0.3, pointRadius: 3, borderWidth: 2 },
+      { label: 'Aprobados', data: groups.map((g) => rate(g.a, g.m)), borderColor: COLORS.apr, backgroundColor: COLORS.apr + '22', fill: false, tension: 0.35, pointRadius: 3, pointHoverRadius: 7, borderWidth: 3 },
+      { label: 'Desaprobados', data: groups.map((g) => rate(g.d, g.m)), borderColor: COLORS.des, backgroundColor: COLORS.des + '22', fill: false, tension: 0.35, pointRadius: 3, pointHoverRadius: 7, borderWidth: 3 },
+      { label: 'Retiro', data: groups.map((g) => rate(g.r, g.m)), borderColor: COLORS.ret, backgroundColor: COLORS.ret + '22', fill: false, tension: 0.35, pointRadius: 3, pointHoverRadius: 7, borderWidth: 3 },
+      { label: 'Abandono', data: groups.map((g) => rate(g.b, g.m)), borderColor: COLORS.abn, backgroundColor: COLORS.abn + '22', fill: false, tension: 0.35, pointRadius: 3, pointHoverRadius: 7, borderWidth: 3 },
     ];
   } else if (indicador === 'ret') {
-    datasets = [{ label: 'Retiro', data: groups.map((g) => rate(g.r, g.m)), borderColor: COLORS.ret, backgroundColor: COLORS.ret + '22', fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2 }];
+    datasets = [{ label: 'Retiro', data: groups.map((g) => rate(g.r, g.m)), borderColor: COLORS.ret, backgroundColor: COLORS.ret + '22', fill: true, tension: 0.35, pointRadius: 4, pointHoverRadius: 8, borderWidth: 3 }];
   } else if (indicador === 'abn') {
-    datasets = [{ label: 'Abandono', data: groups.map((g) => rate(g.b, g.m)), borderColor: COLORS.abn, backgroundColor: COLORS.abn + '22', fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2 }];
+    datasets = [{ label: 'Abandono', data: groups.map((g) => rate(g.b, g.m)), borderColor: COLORS.abn, backgroundColor: COLORS.abn + '22', fill: true, tension: 0.35, pointRadius: 4, pointHoverRadius: 8, borderWidth: 3 }];
   } else {
     const fn =
       indicador === 'apr'
@@ -44,9 +45,10 @@ export default function TrendChart({ groups, indicador }: Props) {
         borderColor: COLORS[indicador],
         backgroundColor: COLORS[indicador] + '22',
         fill: true,
-        tension: 0.3,
+        tension: 0.35,
         pointRadius: 4,
-        borderWidth: 2,
+        pointHoverRadius: 8,
+        borderWidth: 3,
       },
     ];
   }
@@ -58,13 +60,22 @@ export default function TrendChart({ groups, indicador }: Props) {
         options={{
           responsive: true,
           maintainAspectRatio: false,
+          animation: { duration: getChartAnimationDuration(), easing: 'easeOutQuart' },
           scales: {
-            y: { ticks: { callback: (v) => v + '%' } },
+            y: { beginAtZero: true, ticks: { callback: (v) => v + '%' } },
             x: { grid: { display: false } },
           },
           plugins: {
-            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${(c.parsed.y as number).toFixed(2)}%` } },
-            legend: { position: 'top', labels: { font: { size: 11 } } },
+            tooltip: {
+              backgroundColor: '#292722',
+              titleColor: '#ffffff',
+              bodyColor: '#f5f3ef',
+              padding: 12,
+              cornerRadius: 8,
+              displayColors: true,
+              callbacks: { label: (c) => `${c.dataset.label}: ${(c.parsed.y as number).toFixed(2)}%` },
+            },
+            legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', padding: 16, font: { size: 11 } } },
           },
         }}
       />

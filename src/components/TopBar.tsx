@@ -23,9 +23,11 @@ export default function TopBar({
       <button
         type="button"
         onClick={onToggleMobile}
-        className="md:hidden fixed top-4 left-4 z-50 flex items-center gap-2 rounded-full px-4 py-2 shadow-lg text-white"
+        className="md:hidden fixed top-4 left-4 z-50 flex items-center gap-2 rounded-lg px-4 py-2 shadow-md text-white"
         style={{ backgroundColor: 'var(--granate)' }}
         aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+        aria-expanded={mobileOpen}
+        aria-controls="mobile-menu"
       >
         {mobileOpen ? <X size={18} /> : <Menu size={18} />}
         <span className="text-xs font-semibold">{mobileOpen ? 'Cerrar' : 'Menú'}</span>
@@ -41,13 +43,17 @@ export default function TopBar({
       )}
 
       <aside
+        id="mobile-menu"
+        aria-label="Menú y filtros del tablero"
+        aria-hidden={!mobileOpen}
+        inert={!mobileOpen}
         className={[
           'fixed md:hidden inset-y-0 left-0 z-50 h-full w-[88vw] max-w-sm',
           'transform transition-transform duration-300 ease-out',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
       >
-        <header className="relative h-full rounded-r-2xl border-r border-t border-b shadow-[0_8px_24px_rgba(90,22,32,0.12)] flex flex-col overflow-hidden" style={{ borderColor: 'var(--granate-oscuro)', backgroundColor: 'var(--papel)' }}>
+        <header className="relative h-full rounded-r-xl border-r border-t border-b shadow-[0_8px_24px_rgba(41,39,34,0.14)] flex flex-col overflow-hidden" style={{ borderColor: 'var(--linea)', backgroundColor: 'var(--papel)' }}>
           <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b" style={{ backgroundColor: 'var(--granate)', borderColor: 'var(--dorado)', color: '#ffffff' }}>
             <div className="text-[10px] uppercase tracking-[0.16em]" style={{ color: 'var(--dorado)' }}>
               Menú institucional
@@ -64,7 +70,7 @@ export default function TopBar({
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b-4" style={{ backgroundColor: 'var(--granate)', borderColor: 'var(--dorado)', color: '#ffffff' }}>
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-b-2" style={{ backgroundColor: 'var(--granate)', borderColor: 'var(--dorado)', color: '#ffffff' }}>
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div className="max-w-2xl">
                 <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--dorado)' }}>
@@ -73,7 +79,7 @@ export default function TopBar({
                 <h1 className="font-serif text-[20px] sm:text-[28px] leading-tight font-normal text-white">
                   Tablero de Control - Pregrado
                 </h1>
-                <p className="font-serif italic text-[13px] sm:text-[15px] opacity-95 mt-1" style={{ color: '#f7efe6' }}>
+                <p className="text-[13px] sm:text-sm mt-1 text-white/85">
                   Rendimiento académico y seguimiento institucional
                 </p>
                 <p className="mt-2 text-[10px] font-semibold tracking-wide" style={{ color: 'var(--dorado)' }}>
@@ -81,16 +87,16 @@ export default function TopBar({
                 </p>
               </div>
 
-              <div className="text-left md:text-right text-[11px] sm:text-xs leading-relaxed px-3 py-2 rounded-xl border" style={{ backgroundColor: 'rgba(250,247,242,0.12)', borderColor: 'rgba(255,255,255,0.18)' }}>
+              <div className="text-left md:text-right text-[11px] sm:text-xs leading-relaxed px-3 py-2 rounded-lg border" style={{ backgroundColor: 'rgba(250,247,242,0.08)', borderColor: 'rgba(255,255,255,0.16)' }}>
                 <div className="font-semibold text-white">{session.name}</div>
                 <div className="font-semibold" style={{ color: 'var(--dorado)' }}>{ROLE_LABELS[session.role]}</div>
-                {session.facultad && <div style={{ color: '#f8f1e8' }}>{session.facultad}</div>}
-                {session.escuela && <div style={{ color: '#f8f1e8' }}>{session.escuela}</div>}
+                {session.facultad && <div className="text-white/80">{session.facultad}</div>}
+                {session.escuela && <div className="text-white/80">{session.escuela}</div>}
               </div>
             </div>
           </div>
 
-          <div className="p-4 sm:p-5 bg-white/80">
+          <div className="p-4 sm:p-5 bg-[var(--papel)]">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--texto-sec)]">Filtros</p>
@@ -122,8 +128,8 @@ export default function TopBar({
         </header>
       </aside>
 
-      <header className="hidden md:block overflow-hidden rounded-2xl border shadow-[0_8px_24px_rgba(90,22,32,0.12)]" style={{ borderColor: 'var(--granate-oscuro)', backgroundColor: 'var(--papel)' }}>
-        <div className="px-4 sm:px-6 py-4 sm:py-6 border-b-4" style={{ backgroundColor: 'var(--granate)', borderColor: 'var(--dorado)', color: '#ffffff' }}>
+      <header className="hidden md:block overflow-hidden rounded-xl border shadow-[0_4px_16px_rgba(41,39,34,0.08)]" style={{ borderColor: 'var(--linea)', backgroundColor: 'var(--papel)' }}>
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b-2" style={{ backgroundColor: 'var(--granate)', borderColor: 'var(--dorado)', color: '#ffffff' }}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.16em] mb-1" style={{ color: 'var(--dorado)' }}>
@@ -132,16 +138,16 @@ export default function TopBar({
               <h1 className="font-serif text-[24px] lg:text-[30px] leading-tight font-normal text-white">
                 Tablero de Control - Pregrado
               </h1>
-              <p className="font-serif italic text-[14px] lg:text-[16px] opacity-95 mt-1" style={{ color: '#f7efe6' }}>
+              <p className="text-sm lg:text-[15px] mt-1 text-white/85">
                 Rendimiento académico y seguimiento institucional
               </p>
             </div>
 
-            <div className="text-right text-xs leading-relaxed px-4 py-3 rounded-xl border" style={{ backgroundColor: 'rgba(250,247,242,0.12)', borderColor: 'rgba(255,255,255,0.18)' }}>
+            <div className="text-right text-xs leading-relaxed px-4 py-3 rounded-lg border" style={{ backgroundColor: 'rgba(250,247,242,0.08)', borderColor: 'rgba(255,255,255,0.16)' }}>
               <div className="font-semibold text-white">{session.name}</div>
               <div className="font-semibold" style={{ color: 'var(--dorado)' }}>{ROLE_LABELS[session.role]}</div>
-              {session.facultad && <div style={{ color: '#f8f1e8' }}>{session.facultad}</div>}
-              {session.escuela && <div style={{ color: '#f8f1e8' }}>{session.escuela}</div>}
+              {session.facultad && <div className="text-white/80">{session.facultad}</div>}
+              {session.escuela && <div className="text-white/80">{session.escuela}</div>}
             </div>
           </div>
         </div>

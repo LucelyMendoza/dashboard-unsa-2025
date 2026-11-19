@@ -30,9 +30,9 @@ export default function KpiGrid({ groups }: Props) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       {cards.map((c) => (
-        <div key={c.l} className="bg-white border border-slate-200 rounded-lg p-3 text-center">
+        <div key={c.l} className="dashboard-panel dashboard-panel-interactive p-3 text-center">
           <div className="text-xl sm:text-2xl font-bold tabular-nums" style={{ color: c.color }}>
             {c.v}
           </div>

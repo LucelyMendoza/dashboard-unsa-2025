@@ -4,12 +4,12 @@ import type { ScorecardRow } from '@/types/dashboard';
 import TablePagination from '@/components/TablePagination';
 
 const HEAT_BG: Record<string, string> = {
-  g6: '#dcfce7',
-  g5: '#f0fdf4',
-  g4: '#fefce8',
-  g3: '#fef3c7',
-  g2: '#fee2e2',
-  g1: '#fecaca',
+  g6: '#e4ece7',
+  g5: '#edf1ec',
+  g4: '#f2f0e5',
+  g3: '#efe6d5',
+  g2: '#f0e2dd',
+  g1: '#ead5d1',
 };
 
 export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
@@ -25,7 +25,7 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
       <table className="academic-table min-w-max text-xs whitespace-nowrap">
         <thead>
           <tr>
-            <th className="text-left">Escuela</th>
+            <th className="school-name-heading text-left">Escuela</th>
             <th className="text-left">Facultad</th>
             <th className="text-right">Matr.</th>
             <th className="text-right">Aprob.</th>
@@ -46,7 +46,7 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
             const tr = trendLabel(c.sl);
             return (
               <tr key={c.e}>
-                <td className="font-semibold">{c.e}</td>
+                <td className="school-name-cell font-semibold" title={c.e}>{c.e}</td>
                 <td className="text-[10px] text-slate-400">{c.f}</td>
                 <td className="text-right">{fmt(c.tm)}</td>
                 <td className="text-right font-semibold" style={{ background: HEAT_BG[hmClass(c.ta)] }}>

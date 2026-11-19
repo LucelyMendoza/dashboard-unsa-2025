@@ -13,38 +13,38 @@ const PAGE_SIZES = [25, 50, 100];
 const METRICS: Record<MetricKey, { label: string; accent: string; bands: Record<RateBand, string> }> = {
   apr: {
     label: 'Aprobados',
-    accent: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    accent: 'border-[#d4dfd8] bg-[#edf1ed] text-[#42604f]',
     bands: {
-      low: 'bg-rose-50 text-rose-800',
-      medium: 'bg-amber-50 text-amber-800',
-      high: 'bg-emerald-50 text-emerald-800',
+      low: 'bg-[#f0e2dd] text-[#8a514b]',
+      medium: 'bg-[#f2f0e5] text-[#715832]',
+      high: 'bg-[#e4ece7] text-[#42604f]',
     },
   },
   des: {
     label: 'Desaprobados',
-    accent: 'border-rose-200 bg-rose-50 text-rose-800',
+    accent: 'border-[#e2d2ce] bg-[#f3e8e4] text-[#8a514b]',
     bands: {
-      low: 'bg-emerald-50 text-emerald-800',
-      medium: 'bg-orange-50 text-orange-800',
-      high: 'bg-rose-100 text-rose-900',
+      low: 'bg-[#e4ece7] text-[#42604f]',
+      medium: 'bg-[#efe6d5] text-[#715832]',
+      high: 'bg-[#ead5d1] text-[#783e3c]',
     },
   },
   ret: {
     label: 'Retiros',
-    accent: 'border-amber-200 bg-amber-50 text-amber-900',
+    accent: 'border-[#e2d8c6] bg-[#f2eee5] text-[#826c43]',
     bands: {
-      low: 'bg-sky-50 text-sky-800',
-      medium: 'bg-amber-50 text-amber-900',
-      high: 'bg-orange-100 text-orange-900',
+      low: 'bg-[#e7ecee] text-[#5b6d79]',
+      medium: 'bg-[#f2f0e5] text-[#715832]',
+      high: 'bg-[#efe0d2] text-[#765536]',
     },
   },
   abn: {
     label: 'Abandonos',
-    accent: 'border-violet-200 bg-violet-50 text-violet-900',
+    accent: 'border-[#dfd6d4] bg-[#f0e8e6] text-[#783e3c]',
     bands: {
-      low: 'bg-teal-50 text-teal-800',
-      medium: 'bg-violet-50 text-violet-800',
-      high: 'bg-purple-100 text-purple-900',
+      low: 'bg-[#e4ece7] text-[#42604f]',
+      medium: 'bg-[#eee6df] text-[#6f5b50]',
+      high: 'bg-[#ead5d1] text-[#783e3c]',
     },
   },
 };
@@ -119,8 +119,8 @@ export default function SubjectHeatmap({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-[var(--papel)]">
+      <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/80 px-3 py-3 sm:px-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${METRICS[metric].accent}`}>
             {METRICS[metric].label}
@@ -148,8 +148,8 @@ export default function SubjectHeatmap({
         <table className="academic-table min-w-max text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 min-w-[120px] text-left">CODIGO</th>
-              <th className="min-w-[240px] text-left">Asignatura</th>
+              <th className="subject-code-heading text-left">Código</th>
+              <th className="subject-name-heading text-left">Asignatura</th>
               <th className="min-w-[115px] text-right">Global %</th>
               {periodList.map((p) => (
                 <th key={p} className="min-w-[72px] text-right">{p}</th>
@@ -161,10 +161,10 @@ export default function SubjectHeatmap({
             {pageRows.map((a, i) => {
               const globalBand = METRICS[metric].bands[getRateBand(metric, a.rate)];
               return (
-                <tr key={a.subjectIndex} className={`border-t border-slate-100 transition-colors hover:bg-slate-50 ${i % 2 ? 'bg-slate-50/40' : 'bg-white'}`}>
-                    <td className="sticky left-0 z-[1] bg-inherit font-mono text-[11px] text-slate-600">{AC[a.subjectIndex] || '—'}</td>
-                    <td className="max-w-[360px] truncate font-medium text-slate-700" title={AN[a.subjectIndex]}>
-                      {AN[a.subjectIndex]}
+                <tr key={a.subjectIndex} className={`subject-row border-t border-slate-100 transition-colors ${i % 2 ? 'bg-slate-50/40' : 'bg-white'}`}>
+                    <td className="subject-code-cell font-mono text-[11px] text-slate-600">{AC[a.subjectIndex] || '—'}</td>
+                    <td className="subject-name-cell font-medium text-slate-700" title={AN[a.subjectIndex]}>
+                      <span className="line-clamp-2">{AN[a.subjectIndex]}</span>
                     </td>
                   <td className="px-3 py-2 text-right">
                     <span className={`inline-flex min-w-[68px] justify-end rounded-md px-2 py-1 font-semibold tabular-nums ${globalBand}`}>

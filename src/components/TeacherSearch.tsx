@@ -8,8 +8,8 @@ import type { FilterState } from '@/lib/data-utils';
 import TablePagination from '@/components/TablePagination';
 
 const HEAT_TEXT: Record<string, string> = {
-  g6: 'text-emerald-700', g5: 'text-emerald-600', g4: 'text-amber-600',
-  g3: 'text-amber-700', g2: 'text-red-600', g1: 'text-red-700',
+  g6: 'text-[#42604f]', g5: 'text-[#56705e]', g4: 'text-[#826c43]',
+  g3: 'text-[#8b6842]', g2: 'text-[#8a514b]', g1: 'text-[#783e3c]',
 };
 
 type CourseSummary = {
@@ -28,39 +28,51 @@ function TeacherCard({ teacher }: { teacher: TeacherSummary }) {
   const pageCount = Math.max(1, Math.ceil(teacher.rows.length / pageSize));
   const currentPage = Math.min(page, pageCount - 1);
   const visibleRows = teacher.rows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const metrics = [
+    { label: 'Matriculados', value: fmt(teacher.tm) },
+    { label: 'Aprobados', value: fmt(teacher.ta) },
+    { label: 'Desaprobados', value: fmt(teacher.td) },
+    { label: 'Retiros', value: fmt(teacher.tret) },
+    { label: 'Abandonos', value: fmt(teacher.tab) },
+    { label: 'Tasa de aprobación', value: pct(teacher.gr), valueClass: HEAT_TEXT[hmClass(teacher.gr)] },
+  ];
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-bold tracking-tight text-slate-800">{teacher.name}</h3>
-            <p className="mt-1 text-xs text-slate-500">{teacher.locations.join(' · ') || 'Sin facultad o escuela registrada'}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            {[
-              ['Matriculados', teacher.tm], ['Aprobados', teacher.ta], ['Desaprobados', teacher.td],
-              ['Retiros', teacher.tret], ['Abandonos', teacher.tab], ['Tasa aprob.', pct(teacher.gr)],
-            ].map(([label, value]) => (
-              <div key={String(label)} className="min-w-[92px] rounded-lg bg-slate-50 px-3 py-2">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
-                <p className={`mt-0.5 text-sm font-semibold tabular-nums ${label === 'Tasa aprob.' ? HEAT_TEXT[hmClass(teacher.gr)] : 'text-slate-800'}`}>
-                  {typeof value === 'number' ? fmt(value) : value}
-                </p>
-              </div>
-            ))}
-          </div>
+    <article className="dashboard-panel overflow-hidden transition-shadow hover:shadow-md">
+      <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-bold tracking-tight text-slate-800">{teacher.name}</h3>
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500" title={teacher.locations.join(' · ') || 'Sin facultad o escuela registrada'}>
+            {teacher.locations.join(' · ') || 'Sin facultad o escuela registrada'}
+          </p>
         </div>
-        <p className="mt-3 text-[11px] text-slate-500">
-          <span className="font-semibold text-slate-700">{teacher.rows.length}</span> registros de curso
-          <span className="mx-2 text-slate-300">|</span>
-          <span className="font-semibold text-slate-700">{teacher.subjects.length}</span> asignaturas
-          {teacher.subjects.length > 0 && <span className="ml-1">· {teacher.subjects.slice(0, 3).join(', ')}{teacher.subjects.length > 3 ? '…' : ''}</span>}
-        </p>
+      </div>
+
+      <dl className="grid grid-cols-2 gap-2 px-4 py-4 sm:grid-cols-3 sm:gap-3 sm:px-5 xl:grid-cols-6">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="min-w-0 rounded-lg border border-[var(--linea)] bg-[#f7f5f1] px-3 py-3 sm:px-3.5">
+            <dt className="min-h-8 text-[10px] font-medium leading-4 text-slate-500 sm:min-h-0">
+              {metric.label}
+            </dt>
+            <dd className={`mt-1 text-base font-semibold tabular-nums ${metric.valueClass ?? 'text-slate-800'}`}>
+              {metric.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="mx-4 mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-[11px] text-slate-500 sm:mx-5">
+        <span><span className="font-semibold text-slate-700">{teacher.rows.length}</span> registros de curso</span>
+        <span><span className="font-semibold text-slate-700">{teacher.subjects.length}</span> asignaturas</span>
+        {teacher.subjects.length > 0 && (
+          <span className="min-w-0 basis-full truncate sm:basis-auto" title={teacher.subjects.join(', ')}>
+            {teacher.subjects.slice(0, 3).join(', ')}{teacher.subjects.length > 3 ? '…' : ''}
+          </span>
+        )}
       </div>
 
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-semibold text-[var(--accent)] hover:bg-red-50/50 sm:px-5">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--crema)] sm:px-5">
           <span>Ver historial de cursos</span>
           <span className="text-slate-400 transition-transform group-open:rotate-180">⌄</span>
         </summary>
@@ -153,7 +165,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="dashboard-panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-bold text-slate-800">Directorio de docentes</h2>
           <p className="mt-1 text-xs text-slate-500">
@@ -166,19 +178,19 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
           <input value={q} onChange={(event) => { setQ(event.target.value); setPage(0); }}
             placeholder="Buscar docente por nombre..." aria-label="Buscar docente por nombre"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs outline-none transition focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-red-100" />
+            className="dashboard-control w-full rounded-lg border py-2 pl-9 pr-3 text-xs outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--linea)]" />
         </div>
       </div>
 
       {!results.length ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+        <div className="dashboard-panel border-dashed px-4 py-12 text-center">
           <p className="text-sm font-semibold text-slate-600">No hay docentes para estos filtros</p>
           <p className="mt-1 text-xs text-slate-400">Prueba otra facultad, escuela o búsqueda.</p>
         </div>
       ) : (
         <>
           <div className="space-y-3">{visibleResults.map((teacher) => <TeacherCard key={teacher.name} teacher={teacher} />)}</div>
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="dashboard-panel overflow-hidden">
             <TablePagination total={results.length} page={currentPage} pageSize={pageSize} onPageChange={setPage}
               onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} itemLabel="docentes" />
           </div>

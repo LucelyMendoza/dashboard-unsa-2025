@@ -26,7 +26,7 @@ export default function IndicatorCards({ groups }: { groups: GroupedTotals[] }) 
         const trend = last && prev ? dlt(last.v, prev.v) : '—';
 
         return (
-          <div key={ind.k} className="bg-white border border-slate-200 rounded-lg p-4">
+          <div key={ind.k} className="dashboard-panel p-4">
             <h3 className="text-sm font-bold" style={{ color: ind.color }}>
               {ind.l}
             </h3>
