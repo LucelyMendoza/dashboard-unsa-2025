@@ -8,7 +8,7 @@ import { firebaseAuth } from '@/lib/firebase';
 import { getSession, clearSession, getRoleScope } from '@/lib/session';
 import { getAllowedTabs, canViewTab } from '@/lib/roles';
 import type { DashboardTab } from '@/types/dashboard';
-import { DEFAULT_FILTERS, FilterState, filterAgg, filterScorecard, groupBy } from '@/lib/data-utils';
+import { DEFAULT_FILTERS, FilterState, buildScorecard, filterAgg, groupBy } from '@/lib/data-utils';
 import { recomputeDerived } from '@/lib/recompute';
 import { STATIC_DATASET_URL } from '@/lib/generated-dataset';
 import AdminUploadModal from '@/components/AdminUploadModal';
@@ -18,13 +18,19 @@ import Tabs, { TabDef } from '@/components/Tabs';
 import KpiGrid from '@/components/KpiGrid';
 import TrendChart from '@/components/TrendChart';
 import GroupedBarChart from '@/components/GroupedBarChart';
+import SchoolComparison from '@/components/SchoolComparison';
 import IndicatorCards from '@/components/IndicatorCards';
 import SchoolScorecard from '@/components/SchoolScorecard';
 import SubjectHeatmap from '@/components/SubjectHeatmap';
 import TeacherSearch from '@/components/TeacherSearch';
 
-function applyProgramFilter(dataset: DashboardDataset, facultad: string, escuela: string, programa: string): DashboardDataset {
-  if (facultad !== 'CIENCIAS DE LA EDUCACIÓN' || escuela === 'ALL' || programa === 'ALL') {
+function applyProgramFilter(dataset: DashboardDataset, facultades: string[], escuelas: string[], programa: string): DashboardDataset {
+  if (
+    facultades.length !== 1 ||
+    facultades[0] !== 'CIENCIAS DE LA EDUCACIÓN' ||
+    escuelas.length !== 1 ||
+    programa === 'ALL'
+  ) {
     return dataset;
   }
 
@@ -60,7 +66,11 @@ export default function DashboardPage() {
     const s = getSession();
     if (!s) return DEFAULT_FILTERS;
     const scope = getRoleScope(s);
-    return { ...DEFAULT_FILTERS, facultad: scope.facultad, escuela: scope.escuela };
+    return {
+      ...DEFAULT_FILTERS,
+      facultad: scope.facultad === 'ALL' ? [] : [scope.facultad],
+      escuela: scope.escuela === 'ALL' ? [] : [scope.escuela],
+    };
   });
   const [subjectMetric, setSubjectMetric] = useState<'apr' | 'des' | 'ret' | 'abn'>('apr');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -158,10 +168,19 @@ export default function DashboardPage() {
     [viewDataset, filteredAgg, filters.agrupacion]
   );
   const scorecardRows = useMemo(
-    () => (viewDataset ? filterScorecard(viewDataset.sc, filters.facultad, filters.escuela) : []),
-    [viewDataset, filters.facultad, filters.escuela]
+    () => buildScorecard(filteredAgg),
+    [filteredAgg]
   );
-  const chScope = filters.facultad === 'ALL' ? 'UNSA' : filters.facultad;
+  const chScope = filters.facultad.length === 0
+    ? 'UNSA'
+    : filters.facultad.length === 1
+      ? filters.facultad[0]
+      : `${filters.facultad.length} facultades seleccionadas`;
+  const schoolScope = filters.escuela.length === 1
+    ? ` / ${filters.escuela[0]}`
+    : filters.escuela.length > 1
+      ? ` / ${filters.escuela.length} escuelas`
+      : '';
 
   if (errorMsg) {
     return (
@@ -190,10 +209,7 @@ export default function DashboardPage() {
       <FiltersBar
         dataset={dataset}
         filters={filters}
-        onChange={(next) => {
-          setFilters(next);
-          setMobileMenuOpen(false);
-        }}
+        onChange={setFilters}
         scope={scope}
       />
     </div>
@@ -230,6 +246,7 @@ export default function DashboardPage() {
       {currentTabAllowed && tab === 'resumen' && (
         <div className="view-enter space-y-5">
           <KpiGrid groups={groups} />
+          <SchoolComparison rows={filteredAgg} grouping={filters.agrupacion} />
 
           <div className="grid grid-cols-1 gap-4">
             <div className="dashboard-panel p-3 sm:p-4 w-full">
@@ -237,7 +254,7 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-bold text-[var(--ink)]">Evolución de Tasas</h3>
                 <span className="text-[11px] text-slate-400">
                   {chScope}
-                  {filters.escuela !== 'ALL' ? ` / ${filters.escuela}` : ''}
+                  {schoolScope}
                 </span>
               </div>
               <div className="mb-3 flex flex-wrap items-center gap-2">

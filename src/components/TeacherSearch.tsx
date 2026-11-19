@@ -130,13 +130,15 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
     dataset.dc.forEach((row) => {
       const name = DN[row[0]] ?? '';
       if (isUnspecified(name)) return;
-      if (filters.facultad !== 'ALL' && F[row[2]] !== filters.facultad) return;
-      if (filters.escuela !== 'ALL' && E[row[3]] !== filters.escuela) return;
+      if (filters.facultad.length > 0 && !filters.facultad.includes(F[row[2]])) return;
+      if (filters.escuela.length > 0 && !filters.escuela.includes(E[row[3]])) return;
+      const period = P[row[1]] ?? '';
+      if (filters.anio.length > 0 && !filters.anio.includes(period.slice(0, 4))) return;
+      if (filters.agrupacion === 'sem' && filters.periodo.length > 0 && !filters.periodo.includes(period)) return;
       if (q.trim() && !name.toLocaleLowerCase('es').includes(q.trim().toLocaleLowerCase('es'))) return;
 
       let courses = byTeacher.get(name);
       if (!courses) { courses = new Map(); byTeacher.set(name, courses); }
-      const period = P[row[1]] ?? '';
       const faculty = F[row[2]] ?? '';
       const school = E[row[3]] ?? '';
       const subject = AN[row[4]] ?? '';
@@ -166,7 +168,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
         gr: rate(ta, tm), subjects, locations,
       };
     }).sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  }, [q, dataset.dc, filters.facultad, filters.escuela, F, E, AN, AC, DN, P]);
+  }, [q, dataset.dc, filters.facultad, filters.escuela, filters.anio, filters.periodo, filters.agrupacion, F, E, AN, AC, DN, P]);
 
   const pageCount = Math.max(1, Math.ceil(results.length / pageSize));
   const currentPage = Math.min(page, pageCount - 1);
@@ -178,8 +180,16 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
         <div>
           <h2 className="text-sm font-bold text-slate-800">Directorio de docentes</h2>
           <p className="mt-1 text-xs text-slate-500">
-            {filters.facultad === 'ALL' ? 'Todas las facultades' : filters.facultad}
-            {filters.escuela !== 'ALL' ? ` · ${filters.escuela}` : ''}
+            {filters.facultad.length === 0
+              ? 'Todas las facultades'
+              : filters.facultad.length === 1
+                ? filters.facultad[0]
+                : `${filters.facultad.length} facultades seleccionadas`}
+            {filters.escuela.length === 1
+              ? ` · ${filters.escuela[0]}`
+              : filters.escuela.length > 1
+                ? ` · ${filters.escuela.length} escuelas seleccionadas`
+                : ''}
             {' · '}{fmt(results.length)} docentes
           </p>
         </div>

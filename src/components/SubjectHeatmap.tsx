@@ -120,8 +120,11 @@ export default function SubjectHeatmap({
     return result;
   }, [sa, P]);
 
-  const periodList =
-    filters.periodo !== 'ALL' ? [filters.periodo] : filters.anio !== 'ALL' ? P.filter((p) => p.startsWith(filters.anio)) : P;
+  const periodList = filters.periodo.length > 0
+    ? filters.periodo
+    : filters.anio.length > 0
+      ? P.filter((period) => filters.anio.includes(period.slice(0, 4)))
+      : P;
 
   const aggList = useMemo(
     () =>
