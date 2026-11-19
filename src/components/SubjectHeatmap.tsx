@@ -7,45 +7,76 @@ import { filterSubjectRows } from '@/lib/data-utils';
 type MetricKey = 'apr' | 'des' | 'ret' | 'abn';
 
 type RateBand = 'low' | 'medium' | 'high';
+type LegendLevel = { band: RateBand; label: string; range: string };
 
 const PAGE_SIZES = [25, 50, 100];
 
-const METRICS: Record<MetricKey, { label: string; accent: string; bands: Record<RateBand, string> }> = {
+const METRICS: Record<MetricKey, {
+  label: string;
+  accent: string;
+  interpretation: string;
+  bands: Record<RateBand, string>;
+  legend: LegendLevel[];
+}> = {
   apr: {
     label: 'Aprobados',
     accent: 'border-[#d4dfd8] bg-[#edf1ed] text-[#42604f]',
+    interpretation: 'Una tasa más alta es mejor.',
     bands: {
       low: 'bg-[#f0e2dd] text-[#8a514b]',
       medium: 'bg-[#f2f0e5] text-[#715832]',
       high: 'bg-[#e4ece7] text-[#42604f]',
     },
+    legend: [
+      { band: 'high', label: 'Favorable', range: '≥ 80%' },
+      { band: 'medium', label: 'En observación', range: '60% a < 80%' },
+      { band: 'low', label: 'Requiere atención', range: '< 60%' },
+    ],
   },
   des: {
     label: 'Desaprobados',
     accent: 'border-[#e2d2ce] bg-[#f3e8e4] text-[#8a514b]',
+    interpretation: 'Una tasa más baja es mejor.',
     bands: {
       low: 'bg-[#e4ece7] text-[#42604f]',
       medium: 'bg-[#efe6d5] text-[#715832]',
       high: 'bg-[#ead5d1] text-[#783e3c]',
     },
+    legend: [
+      { band: 'low', label: 'Favorable', range: '≤ 10%' },
+      { band: 'medium', label: 'En observación', range: '> 10% a 25%' },
+      { band: 'high', label: 'Requiere atención', range: '> 25%' },
+    ],
   },
   ret: {
     label: 'Retiros',
     accent: 'border-[#e2d8c6] bg-[#f2eee5] text-[#826c43]',
+    interpretation: 'Una tasa más baja es mejor.',
     bands: {
       low: 'bg-[#e7ecee] text-[#5b6d79]',
       medium: 'bg-[#f2f0e5] text-[#715832]',
       high: 'bg-[#efe0d2] text-[#765536]',
     },
+    legend: [
+      { band: 'low', label: 'Favorable', range: '≤ 5%' },
+      { band: 'medium', label: 'En observación', range: '> 5% a 15%' },
+      { band: 'high', label: 'Requiere atención', range: '> 15%' },
+    ],
   },
   abn: {
     label: 'Abandonos',
     accent: 'border-[#dfd6d4] bg-[#f0e8e6] text-[#783e3c]',
+    interpretation: 'Una tasa más baja es mejor.',
     bands: {
       low: 'bg-[#e4ece7] text-[#42604f]',
       medium: 'bg-[#eee6df] text-[#6f5b50]',
       high: 'bg-[#ead5d1] text-[#783e3c]',
     },
+    legend: [
+      { band: 'low', label: 'Favorable', range: '≤ 5%' },
+      { band: 'medium', label: 'En observación', range: '> 5% a 15%' },
+      { band: 'high', label: 'Requiere atención', range: '> 15%' },
+    ],
   },
 };
 
@@ -126,7 +157,7 @@ export default function SubjectHeatmap({
             {METRICS[metric].label}
           </span>
           <span className="text-xs text-slate-500">
-            {fmt(aggList.length)} asignaturas · ordenadas por tasa global
+            {fmt(aggList.length)} asignaturas · ordenadas de menor a mayor tasa
           </span>
         </div>
         <label className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
@@ -143,6 +174,25 @@ export default function SubjectHeatmap({
           </select>
         </label>
       </div>
+
+      <section aria-label={`Leyenda del indicador ${METRICS[metric].label}`} className="border-b border-slate-200 bg-[var(--papel)] px-3 py-3 sm:px-4">
+        <div className="mb-2">
+          <p className="text-[11px] font-semibold text-slate-700">
+            ¿Cómo leer los colores? {METRICS[metric].label}: {METRICS[metric].interpretation}
+          </p>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+            La tasa global combina los periodos seleccionados (casos del indicador ÷ matriculados). Cada columna de periodo muestra su propia tasa.
+          </p>
+        </div>
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {METRICS[metric].legend.map((level) => (
+            <li key={level.band} className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-3 py-2 text-[10px] ${METRICS[metric].bands[level.band]}`}>
+              <span className="font-semibold">{level.label}</span>
+              <span className="shrink-0 font-medium tabular-nums">{level.range}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <div className="max-h-[70vh] overflow-auto">
         <table className="academic-table animated-table min-w-max text-xs">
