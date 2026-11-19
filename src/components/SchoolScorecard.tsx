@@ -1,15 +1,30 @@
 import React, { useState } from 'react';
-import { fmt, hmClass, pct, riskEmoji, trendLabel, YEARS } from '@/lib/data-utils';
+import { fmt, hmClass, pct, riskClass, trendLabel, YEARS } from '@/lib/data-utils';
 import type { ScorecardRow } from '@/types/dashboard';
 import TablePagination from '@/components/TablePagination';
 
 const HEAT_BG: Record<string, string> = {
-  g6: '#e4ece7',
-  g5: '#edf1ec',
-  g4: '#f2f0e5',
-  g3: '#efe6d5',
-  g2: '#f0e2dd',
-  g1: '#ead5d1',
+  g6: '#b7e4c7',
+  g5: '#d8edbd',
+  g4: '#fff0a6',
+  g3: '#ffd98a',
+  g2: '#ffbd8b',
+  g1: '#f2a3a0',
+};
+
+const HEAT_TEXT: Record<string, string> = {
+  g6: '#174b2d',
+  g5: '#31551e',
+  g4: '#624800',
+  g3: '#70420a',
+  g2: '#73320d',
+  g1: '#702321',
+};
+
+const RISK_STYLES = {
+  'risk-low': { label: 'Bajo', className: 'bg-[#c6efd2] text-[#174b2d] ring-[#76c58e]' },
+  'risk-mid': { label: 'Medio', className: 'bg-[#fff0a6] text-[#624800] ring-[#e0b83f]' },
+  'risk-high': { label: 'Alto', className: 'bg-[#f4b2ae] text-[#702321] ring-[#d97972]' },
 };
 
 export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
@@ -22,7 +37,7 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="academic-table-shell max-h-[70vh] rounded-none border-0">
-      <table className="academic-table min-w-max text-xs whitespace-nowrap">
+      <table className="academic-table animated-table min-w-max text-xs whitespace-nowrap">
         <thead>
           <tr>
             <th className="school-name-heading text-left">Escuela</th>
@@ -38,18 +53,19 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
                 {y}
               </th>
             ))}
-            <th className="text-center">Riesgo</th>
+            <th className="text-center">Semáforo</th>
           </tr>
         </thead>
         <tbody>
           {visibleRows.map((c) => {
             const tr = trendLabel(c.sl);
+            const risk = RISK_STYLES[riskClass(c.ta) as keyof typeof RISK_STYLES];
             return (
               <tr key={c.e}>
                 <td className="school-name-cell font-semibold" title={c.e}>{c.e}</td>
                 <td className="text-[10px] text-slate-400">{c.f}</td>
                 <td className="text-right">{fmt(c.tm)}</td>
-                <td className="text-right font-semibold" style={{ background: HEAT_BG[hmClass(c.ta)] }}>
+                <td className="text-right font-bold tabular-nums" style={{ background: HEAT_BG[hmClass(c.ta)], color: HEAT_TEXT[hmClass(c.ta)] }}>
                   {pct(c.ta)}
                 </td>
                 <td className="text-right">{pct(c.td)}</td>
@@ -59,12 +75,21 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
                 {YEARS.map((y) => {
                   const v = c.yr[String(y)];
                   return (
-                    <td key={y} className="text-right" style={v != null ? { background: HEAT_BG[hmClass(v)] } : { color: '#ccc' }}>
+                    <td key={y} className="text-right tabular-nums" style={v != null ? { background: HEAT_BG[hmClass(v)], color: HEAT_TEXT[hmClass(v)] } : { color: '#ccc' }}>
                       {v != null ? v.toFixed(1) + '%' : '—'}
                     </td>
                   );
                 })}
-                <td className="text-center">{riskEmoji(c.ta)}</td>
+                <td className="text-center">
+                  <span
+                    className={`inline-flex min-w-[4.75rem] items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ring-inset ${risk.className}`}
+                    aria-label={`Riesgo ${risk.label.toLocaleLowerCase('es')} con tasa de aprobación de ${pct(c.ta)}`}
+                    title={`Tasa de aprobación: ${pct(c.ta)}`}
+                  >
+                    <span aria-hidden="true" className="h-2 w-2 rounded-full bg-current" />
+                    {risk.label}
+                  </span>
+                </td>
               </tr>
             );
           })}

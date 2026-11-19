@@ -41,6 +41,7 @@ body {
   background: var(--papel);
   box-shadow: 0 2px 8px rgb(41 39 34 / 4%);
   transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
+  animation: dashboard-enter 380ms ease-out both;
 }
 
 .dashboard-panel-interactive:hover {
@@ -65,6 +66,42 @@ body {
   animation-delay: 150ms;
 }
 
+.teacher-card-enter {
+  animation: dashboard-enter 340ms ease-out both;
+}
+
+.teacher-card-enter:nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.teacher-card-enter:nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.teacher-card-enter:nth-child(4) {
+  animation-delay: 135ms;
+}
+
+.animated-table tbody tr {
+  animation: table-row-enter 280ms ease-out both;
+}
+
+.animated-table tbody tr:nth-child(2) {
+  animation-delay: 25ms;
+}
+
+.animated-table tbody tr:nth-child(3) {
+  animation-delay: 50ms;
+}
+
+.animated-table tbody tr:nth-child(4) {
+  animation-delay: 75ms;
+}
+
+.animated-table tbody tr:nth-child(5) {
+  animation-delay: 100ms;
+}
+
 @keyframes view-enter {
   from {
     opacity: 0;
@@ -74,6 +111,28 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes dashboard-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes table-row-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }
 

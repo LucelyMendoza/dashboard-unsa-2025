@@ -145,7 +145,7 @@ export default function SubjectHeatmap({
       </div>
 
       <div className="max-h-[70vh] overflow-auto">
-        <table className="academic-table min-w-max text-xs">
+        <table className="academic-table animated-table min-w-max text-xs">
           <thead>
             <tr>
               <th className="subject-code-heading text-left">Código</th>

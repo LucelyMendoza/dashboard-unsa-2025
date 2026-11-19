@@ -38,7 +38,7 @@ function TeacherCard({ teacher }: { teacher: TeacherSummary }) {
   ];
 
   return (
-    <article className="dashboard-panel overflow-hidden transition-shadow hover:shadow-md">
+    <article className="dashboard-panel teacher-card-enter overflow-hidden transition-shadow hover:shadow-md">
       <div className="px-4 pt-4 sm:px-5 sm:pt-5">
         <div className="min-w-0">
           <h3 className="text-[15px] font-bold tracking-tight text-slate-800">{teacher.name}</h3>
@@ -78,7 +78,7 @@ function TeacherCard({ teacher }: { teacher: TeacherSummary }) {
         </summary>
         <div className="border-t border-slate-100">
           <div className="academic-table-shell rounded-none border-0">
-            <table className="academic-table min-w-[980px] text-xs">
+            <table className="academic-table animated-table min-w-[980px] text-xs">
               <thead><tr>
                 <th className="text-left">Año</th><th className="text-left">Periodo</th>
                 <th className="text-left">Escuela</th><th className="text-left">Código</th>
@@ -122,7 +122,8 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
     const byTeacher = new Map<string, Map<string, CourseSummary>>();
     dataset.dc.forEach((row) => {
       const name = DN[row[0]] ?? '';
-      if (!name.trim()) return;
+      const normalizedName = name.trim().toLocaleLowerCase('es').replace(/[()[\]]/g, '').trim();
+      if (!normalizedName || ['sin especificar', 'no especificado', 'no especificada'].includes(normalizedName)) return;
       if (filters.facultad !== 'ALL' && F[row[2]] !== filters.facultad) return;
       if (filters.escuela !== 'ALL' && E[row[3]] !== filters.escuela) return;
       if (q.trim() && !name.toLocaleLowerCase('es').includes(q.trim().toLocaleLowerCase('es'))) return;
