@@ -36,6 +36,14 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-2 border-b border-[var(--linea)] bg-[#f7f5f1] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+        <p className="text-[11px] font-semibold text-slate-600">Semáforo de aprobación</p>
+        <div className="flex flex-wrap gap-2 text-[10px] font-semibold">
+          <span className="rounded-full bg-[#c6efd2] px-2.5 py-1 text-[#174b2d] ring-1 ring-inset ring-[#76c58e]">Verde ≥ 90%</span>
+          <span className="rounded-full bg-[#fff0a6] px-2.5 py-1 text-[#624800] ring-1 ring-inset ring-[#e0b83f]">Amarillo 85–89.99%</span>
+          <span className="rounded-full bg-[#f4b2ae] px-2.5 py-1 text-[#702321] ring-1 ring-inset ring-[#d97972]">Rojo &lt; 85%</span>
+        </div>
+      </div>
       <div className="academic-table-shell max-h-[70vh] rounded-none border-0">
       <table className="academic-table animated-table min-w-max text-xs whitespace-nowrap">
         <thead>

@@ -22,6 +22,11 @@ type TeacherSummary = {
   tab: number; tret: number; gr: number; subjects: string[]; locations: string[];
 };
 
+function isUnspecified(value: string) {
+  const normalized = value.trim().toLocaleLowerCase('es').replace(/[()[\]]/g, '').trim();
+  return !normalized || ['sin especificar', 'no especificado', 'no especificada'].includes(normalized);
+}
+
 function TeacherCard({ teacher }: { teacher: TeacherSummary }) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -42,9 +47,11 @@ function TeacherCard({ teacher }: { teacher: TeacherSummary }) {
       <div className="px-4 pt-4 sm:px-5 sm:pt-5">
         <div className="min-w-0">
           <h3 className="text-[15px] font-bold tracking-tight text-slate-800">{teacher.name}</h3>
-          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500" title={teacher.locations.join(' · ') || 'Sin facultad o escuela registrada'}>
-            {teacher.locations.join(' · ') || 'Sin facultad o escuela registrada'}
-          </p>
+          {teacher.locations.length > 0 && (
+            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500" title={teacher.locations.join(' · ')}>
+              {teacher.locations.join(' · ')}
+            </p>
+          )}
         </div>
       </div>
 
@@ -122,8 +129,7 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
     const byTeacher = new Map<string, Map<string, CourseSummary>>();
     dataset.dc.forEach((row) => {
       const name = DN[row[0]] ?? '';
-      const normalizedName = name.trim().toLocaleLowerCase('es').replace(/[()[\]]/g, '').trim();
-      if (!normalizedName || ['sin especificar', 'no especificado', 'no especificada'].includes(normalizedName)) return;
+      if (isUnspecified(name)) return;
       if (filters.facultad !== 'ALL' && F[row[2]] !== filters.facultad) return;
       if (filters.escuela !== 'ALL' && E[row[3]] !== filters.escuela) return;
       if (q.trim() && !name.toLocaleLowerCase('es').includes(q.trim().toLocaleLowerCase('es'))) return;
@@ -149,7 +155,9 @@ export default function TeacherSearch({ dataset, filters }: { dataset: Dashboard
       const tm = rows.reduce((sum, row) => sum + row.m, 0);
       const ta = rows.reduce((sum, row) => sum + row.ap, 0);
       const subjects = [...new Set(rows.map((row) => `${row.code} ${row.a}`.trim()))];
-      const locations = [...new Set(rows.map((row) => row.f + (row.e && row.e !== row.f ? ` · ${row.e}` : '')))];
+      const locations = [...new Set(rows
+        .map((row) => [row.f, row.e !== row.f ? row.e : ''].filter((value) => !isUnspecified(value)).join(' · '))
+        .filter(Boolean))];
       return {
         name, rows, tm, ta,
         td: rows.reduce((sum, row) => sum + row.d, 0),
