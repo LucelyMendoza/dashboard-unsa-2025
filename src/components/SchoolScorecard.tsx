@@ -22,9 +22,9 @@ const HEAT_TEXT: Record<string, string> = {
 };
 
 const RISK_STYLES = {
-  'risk-low': { label: 'Bajo', className: 'bg-[#c6efd2] text-[#174b2d] ring-[#76c58e]' },
-  'risk-mid': { label: 'Medio', className: 'bg-[#fff0a6] text-[#624800] ring-[#e0b83f]' },
-  'risk-high': { label: 'Alto', className: 'bg-[#f4b2ae] text-[#702321] ring-[#d97972]' },
+  'risk-low': { label: 'Bajo riesgo', className: 'bg-[#c6efd2] text-[#174b2d] ring-[#76c58e]' },
+  'risk-mid': { label: 'Riesgo medio', className: 'bg-[#fff0a6] text-[#624800] ring-[#e0b83f]' },
+  'risk-high': { label: 'Alto riesgo', className: 'bg-[#f4b2ae] text-[#702321] ring-[#d97972]' },
 };
 
 export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
@@ -37,11 +37,14 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-col gap-2 border-b border-[var(--linea)] bg-[#f7f5f1] px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-        <p className="text-[11px] font-semibold text-slate-600">Semáforo de aprobación</p>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold text-slate-700">Riesgo según aprobación global</p>
+          <p className="mt-0.5 text-[10px] text-slate-500">Se calcula con la tasa de aprobados de cada escuela: a mayor aprobación, menor riesgo.</p>
+        </div>
         <div className="flex flex-wrap gap-2 text-[10px] font-semibold">
-          <span className="rounded-full bg-[#c6efd2] px-2.5 py-1 text-[#174b2d] ring-1 ring-inset ring-[#76c58e]">Verde ≥ 90%</span>
-          <span className="rounded-full bg-[#fff0a6] px-2.5 py-1 text-[#624800] ring-1 ring-inset ring-[#e0b83f]">Amarillo 85–89.99%</span>
-          <span className="rounded-full bg-[#f4b2ae] px-2.5 py-1 text-[#702321] ring-1 ring-inset ring-[#d97972]">Rojo &lt; 85%</span>
+          <span className="rounded-full bg-[#c6efd2] px-2.5 py-1 text-[#174b2d] ring-1 ring-inset ring-[#76c58e]">Verde · Bajo riesgo · ≥ 90%</span>
+          <span className="rounded-full bg-[#fff0a6] px-2.5 py-1 text-[#624800] ring-1 ring-inset ring-[#e0b83f]">Amarillo · Riesgo medio · 85% a &lt; 90%</span>
+          <span className="rounded-full bg-[#f4b2ae] px-2.5 py-1 text-[#702321] ring-1 ring-inset ring-[#d97972]">Rojo · Alto riesgo · &lt; 85%</span>
         </div>
       </div>
       <div className="academic-table-shell max-h-[70vh] rounded-none border-0">
@@ -61,7 +64,7 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
                 {y}
               </th>
             ))}
-            <th className="text-center">Semáforo</th>
+            <th className="text-center">Riesgo académico</th>
           </tr>
         </thead>
         <tbody>
@@ -90,8 +93,8 @@ export default function SchoolScorecard({ rows }: { rows: ScorecardRow[] }) {
                 })}
                 <td className="text-center">
                   <span
-                    className={`inline-flex min-w-[4.75rem] items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ring-inset ${risk.className}`}
-                    aria-label={`Riesgo ${risk.label.toLocaleLowerCase('es')} con tasa de aprobación de ${pct(c.ta)}`}
+                    className={`inline-flex min-w-[6.5rem] items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ring-inset ${risk.className}`}
+                    aria-label={`${risk.label}, con tasa de aprobación de ${pct(c.ta)}`}
                     title={`Tasa de aprobación: ${pct(c.ta)}`}
                   >
                     <span aria-hidden="true" className="h-2 w-2 rounded-full bg-current" />
