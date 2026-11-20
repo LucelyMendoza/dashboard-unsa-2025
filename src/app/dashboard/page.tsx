@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowRight } from 'lucide-react';
 import { DashboardDataset, UserSession } from '@/types/dashboard';
 import { signOut } from 'firebase/auth';
 import { firebaseAuth } from '@/lib/firebase';
@@ -44,6 +45,7 @@ function applyProgramFilter(dataset: DashboardDataset, facultades: string[], esc
 
 const TABS: TabDef<DashboardTab>[] = [
   { key: 'resumen', label: 'Resumen' },
+  { key: 'comparativas', label: 'Comparativas' },
   { key: 'escuelas', label: 'Escuelas' },
   { key: 'asignaturas', label: 'Asignaturas' },
   { key: 'docentes', label: 'Docentes' },
@@ -271,13 +273,23 @@ export default function DashboardPage() {
 
       {currentTabAllowed && tab === 'resumen' && (
         <div className="view-enter space-y-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[var(--ink)]">Resumen académico</h2>
+              <p className="mt-1 text-xs text-slate-500">Indicadores generales de los periodos seleccionados.</p>
+            </div>
+            {canViewTab(session.role, 'comparativas') && (
+              <button
+                type="button"
+                onClick={() => setTab('comparativas')}
+                className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-lg bg-[var(--granate)] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[var(--granate-oscuro)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--dorado-oscuro)] sm:self-auto"
+              >
+                Comparar facultades y escuelas
+                <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            )}
+          </div>
           <KpiGrid groups={groups} />
-          <SchoolComparison
-            rows={filteredAgg}
-            schools={comparisonSchools}
-            periods={comparisonPeriods}
-            grouping={filters.agrupacion}
-          />
 
           <div className="grid grid-cols-1 gap-4">
             <div className="dashboard-panel p-3 sm:p-4 w-full">
@@ -316,6 +328,23 @@ export default function DashboardPage() {
           </div>
 
           <IndicatorCards groups={groups} />
+        </div>
+      )}
+
+      {currentTabAllowed && tab === 'comparativas' && (
+        <div className="view-enter space-y-5">
+          <div>
+            <h2 className="text-base font-bold text-[var(--ink)]">Comparativas por facultad y escuela</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Explora primero las tendencias de cada facultad y luego compara las escuelas con los filtros seleccionados.
+            </p>
+          </div>
+          <SchoolComparison
+            rows={filteredAgg}
+            schools={comparisonSchools}
+            periods={comparisonPeriods}
+            grouping={filters.agrupacion}
+          />
         </div>
       )}
 

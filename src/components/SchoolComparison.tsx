@@ -9,7 +9,7 @@ import { getChartAnimationDuration } from '@/lib/chart-motion';
 import type { AggregatedRow } from '@/types/dashboard';
 
 type Metric = 'apr' | 'des' | 'ret' | 'abn';
-type ViewMode = 'bars' | 'faculties' | 'heatmap' | 'all';
+type ViewMode = 'combined' | 'bars' | 'faculties' | 'heatmap' | 'all';
 type Counts = { m: number; apr: number; des: number; ret: number; abn: number };
 type SchoolData = { faculty: string; school: string; periods: Record<string, Counts> };
 type SchoolIdentity = { faculty: string; school: string };
@@ -289,7 +289,7 @@ export default function SchoolComparison({
   periods: string[];
   grouping: 'sem' | 'anio';
 }) {
-  const [view, setView] = useState<ViewMode>('bars');
+  const [view, setView] = useState<ViewMode>('combined');
   const [metric, setMetric] = useState<Metric>('apr');
   const { periods, schools } = useMemo(
     () => buildViewData(rows, schoolIdentities, selectedPeriods, grouping),
@@ -309,8 +309,8 @@ export default function SchoolComparison({
       }),
     }))
     .filter((school) => school.missingPeriods.length > 0);
-  const showBars = view === 'bars' || view === 'all';
-  const showFaculties = view === 'faculties' || view === 'all';
+  const showBars = view === 'combined' || view === 'bars' || view === 'all';
+  const showFaculties = view === 'combined' || view === 'faculties' || view === 'all';
   const showHeatmap = view === 'heatmap' || view === 'all';
 
   return (
@@ -331,9 +331,9 @@ export default function SchoolComparison({
               onChange={(event) => setView(event.target.value as ViewMode)}
               className="dashboard-control mt-1 min-h-9 w-full rounded-lg border px-2.5 py-2 text-xs"
             >
+              <option value="combined">Tendencias por facultad y barras por escuela</option>
               <option value="bars">Barras comparativas por escuela</option>
               <option value="faculties">Paneles de tendencias por facultad</option>
-              <option value="heatmap">Mapa de calor por periodo</option>
               <option value="all">Vista completa: todos los gráficos</option>
             </select>
           </label>
@@ -357,7 +357,7 @@ export default function SchoolComparison({
         {view === 'bars' && 'Ordenadas de menor a mayor tasa para identificar rápidamente las escuelas que requieren atención. Cada barra identifica facultad y escuela.'}
         {view === 'faculties' && 'Cada panel muestra la evolución por periodo de las escuelas de una facultad; colores distintos identifican cada escuela dentro del panel.'}
         {view === 'heatmap' && 'Cada celda muestra la tasa de una escuela en un periodo. Verde indica un resultado favorable y rojo uno que requiere atención; el criterio depende del indicador.'}
-        {view === 'all' && 'Se muestran en conjunto el ranking por escuela, las tendencias separadas por facultad y el mapa de calor por periodo.'}
+        {view === 'combined' && 'Se muestran primero las tendencias por facultad y después las barras comparativas por escuela.'}
       </p>
 
       {missingBySchool.length > 0 && (
@@ -381,22 +381,16 @@ export default function SchoolComparison({
       )}
 
       <div className="space-y-5">
-        {showBars && (
-          <section>
-            {view === 'all' && <h4 className="mb-2 text-xs font-bold text-slate-700">1. Comparación de escuelas</h4>}
-            <SchoolBars schools={schools} metric={metric} />
-          </section>
-        )}
         {showFaculties && (
           <section>
-            {view === 'all' && <h4 className="mb-2 text-xs font-bold text-slate-700">2. Tendencias por facultad</h4>}
+            {(view === 'combined' || view === 'all') && <h4 className="mb-2 text-xs font-bold text-slate-700">1. Tendencias por facultad</h4>}
             <FacultyPanels schools={schools} periods={periods} metric={metric} grouping={grouping} />
           </section>
         )}
-        {showHeatmap && (
+        {showBars && (
           <section>
-            {view === 'all' && <h4 className="mb-2 text-xs font-bold text-slate-700">3. Mapa de calor por periodo</h4>}
-            <SchoolHeatmap schools={schools} periods={periods} metric={metric} grouping={grouping} />
+            {(view === 'combined' || view === 'all') && <h4 className="mb-2 text-xs font-bold text-slate-700">2. Comparación de escuelas</h4>}
+            <SchoolBars schools={schools} metric={metric} />
           </section>
         )}
       </div>

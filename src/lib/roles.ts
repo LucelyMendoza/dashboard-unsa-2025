@@ -114,10 +114,10 @@ export function isAdminEmail(email: string): boolean {
 }
 
 export const TAB_PERMISSIONS: Record<UserRole, DashboardTab[]> = {
-  ADMIN: ['resumen', 'escuelas', 'asignaturas', 'docentes'],
-  VICERRECTOR: ['resumen', 'escuelas', 'asignaturas', 'docentes'],
-  DECANO: ['resumen', 'escuelas'],
-  AUTORIDAD: ['resumen', 'escuelas'],
+  ADMIN: ['resumen', 'comparativas', 'escuelas', 'asignaturas', 'docentes'],
+  VICERRECTOR: ['resumen', 'comparativas', 'escuelas', 'asignaturas', 'docentes'],
+  DECANO: ['resumen', 'comparativas', 'escuelas'],
+  AUTORIDAD: ['resumen', 'comparativas', 'escuelas'],
   DIRECTOR: ['asignaturas', 'docentes'],
 };
 
@@ -128,7 +128,7 @@ export function canViewTab(role: UserRole, tab: DashboardTab): boolean {
 
 /** Devuelve las pestañas permitidas para el rol, en el orden canónico del tablero. */
 export function getAllowedTabs(role: UserRole): DashboardTab[] {
-  const canonical: DashboardTab[] = ['resumen', 'escuelas', 'asignaturas', 'docentes'];
+  const canonical: DashboardTab[] = ['resumen', 'comparativas', 'escuelas', 'asignaturas', 'docentes'];
   const allowed = TAB_PERMISSIONS[role] ?? [];
   return canonical.filter((t) => allowed.includes(t));
 }
