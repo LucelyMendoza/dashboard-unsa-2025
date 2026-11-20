@@ -4,15 +4,18 @@ import React, { useMemo, useState } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
 import '@/lib/chart-setup';
 import { fmt, rate } from '@/lib/data-utils';
-import { INDICATOR_CHART_COLORS } from '@/lib/chart-colors';
+import { AREA_CHART_COLORS, getFacultyChartColor, INDICATOR_CHART_COLORS } from '@/lib/chart-colors';
 import { getChartAnimationDuration } from '@/lib/chart-motion';
+import { areaDeFacultad } from '@/lib/school-catalog';
+import type { AcademicArea } from '@/lib/school-catalog';
 import type { AggregatedRow } from '@/types/dashboard';
 
 type Metric = 'apr' | 'des' | 'ret' | 'abn';
-type ViewMode = 'combined' | 'bars' | 'faculties' | 'heatmap' | 'all';
+type ViewMode = 'combined' | 'areas' | 'bars' | 'faculties' | 'heatmap' | 'all';
 type Counts = { m: number; apr: number; des: number; ret: number; abn: number };
 type SchoolData = { faculty: string; school: string; periods: Record<string, Counts> };
 type SchoolIdentity = { faculty: string; school: string };
+type AreaLabel = AcademicArea | 'Sin clasificar';
 
 const METRICS: Record<Metric, { label: string; color: string; field: keyof Counts }> = {
   apr: { label: 'Aprobados', color: INDICATOR_CHART_COLORS.apr, field: 'apr' },
@@ -22,6 +25,7 @@ const METRICS: Record<Metric, { label: string; color: string; field: keyof Count
 };
 
 const SCHOOL_COLORS = ['#672631', '#15986b', '#347fc1', '#d94f57', '#866b3d', '#7353a6', '#18898a', '#b56826'];
+const AREA_ORDER: AreaLabel[] = ['Sociales', 'Ingenierías', 'Biomédicas', 'Sin clasificar'];
 
 function getRate(counts: Counts | undefined, metric: Metric): number | null {
   if (!counts || counts.m === 0) return null;
@@ -108,42 +112,144 @@ function SchoolBars({ schools, metric }: { schools: SchoolData[]; metric: Metric
     .sort((a, b) => (a.value ?? -1) - (b.value ?? -1) || a.school.school.localeCompare(b.school.school));
 
   const height = Math.max(300, Math.min(780, rankedSchools.length * 28 + 80));
+  const faculties = [...new Set(rankedSchools.map(({ school }) => school.faculty))].sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="max-h-[820px] overflow-auto rounded-lg border border-[var(--linea)] p-2">
-      <div style={{ height }}>
-        <Bar
+    <div>
+      <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1" role="list" aria-label="Leyenda de colores por facultad">
+        {faculties.map((faculty) => (
+          <span key={faculty} role="listitem" className="inline-flex max-w-full items-center gap-1.5 text-[10px] text-slate-600">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: getFacultyChartColor(faculty) }} aria-hidden="true" />
+            <span className="max-w-[16rem] truncate" title={faculty}>{faculty}</span>
+          </span>
+        ))}
+      </div>
+      <div className="max-h-[820px] overflow-auto rounded-lg border border-[var(--linea)] p-2">
+        <div style={{ height }}>
+          <Bar
+            data={{
+              labels: rankedSchools.map(({ school }) => `${school.faculty} · ${school.school}`),
+              datasets: [{
+                label: `Tasa de ${metricInfo.label.toLocaleLowerCase('es')}`,
+                data: rankedSchools.map(({ value }) => value),
+                backgroundColor: rankedSchools.map(({ school }) => getFacultyChartColor(school.faculty)),
+                borderRadius: 4,
+                borderSkipped: false,
+              }],
+            }}
+            options={{
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: getChartAnimationDuration(), easing: 'easeOutQuart' },
+              scales: {
+                x: { beginAtZero: true, max: 100, ticks: { callback: (value) => `${value}%` } },
+                y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 10 } } },
+              },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (context) => `${metricInfo.label}: ${Number(context.parsed.x).toFixed(2)}%`,
+                  },
+                },
+              },
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AreaComparison({
+  schools,
+  periods,
+  metric,
+  grouping,
+}: {
+  schools: SchoolData[];
+  periods: string[];
+  metric: Metric;
+  grouping: 'sem' | 'anio';
+}) {
+  const areaCounts = new Map<AreaLabel, Record<string, Counts>>();
+
+  schools.forEach((school) => {
+    const area = areaDeFacultad(school.faculty) ?? 'Sin clasificar';
+    const countsByPeriod = areaCounts.get(area) ?? {};
+    periods.forEach((period) => {
+      const schoolCounts = school.periods[period];
+      if (!schoolCounts) return;
+      const counts = countsByPeriod[period] ?? { m: 0, apr: 0, des: 0, ret: 0, abn: 0 };
+      counts.m += schoolCounts.m;
+      counts.apr += schoolCounts.apr;
+      counts.des += schoolCounts.des;
+      counts.ret += schoolCounts.ret;
+      counts.abn += schoolCounts.abn;
+      countsByPeriod[period] = counts;
+    });
+    areaCounts.set(area, countsByPeriod);
+  });
+
+  const areas = AREA_ORDER.filter((area) => areaCounts.has(area));
+  const unclassifiedFaculties = [...new Set(
+    schools.filter((school) => areaDeFacultad(school.faculty) === null).map((school) => school.faculty)
+  )].sort((a, b) => a.localeCompare(b));
+  const metricInfo = METRICS[metric];
+
+  return (
+    <section className="dashboard-panel p-3 sm:p-4">
+      <div className="mb-3">
+        <h4 className="text-xs font-bold text-[var(--ink)]">Tendencia comparativa por áreas</h4>
+        <p className="mt-1 text-[10px] text-slate-500">
+          Tasas ponderadas: se suman los resultados y matrículas de las escuelas del área; no se promedian sus porcentajes.
+        </p>
+      </div>
+      <div className="h-72 sm:h-80">
+        <Line
           data={{
-            labels: rankedSchools.map(({ school }) => `${school.faculty} · ${school.school}`),
-            datasets: [{
-              label: `Tasa de ${metricInfo.label.toLocaleLowerCase('es')}`,
-              data: rankedSchools.map(({ value }) => value),
-              backgroundColor: metricInfo.color,
-              borderRadius: 4,
-              borderSkipped: false,
-            }],
+            labels: periods.map((period) => periodLabel(period, grouping)),
+            datasets: areas.map((area) => ({
+              label: area,
+              data: periods.map((period) => getRate(areaCounts.get(area)?.[period], metric)),
+              borderColor: AREA_CHART_COLORS[area],
+              backgroundColor: AREA_CHART_COLORS[area] + '22',
+              tension: 0.25,
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              borderWidth: 3,
+              spanGaps: false,
+            })),
           }}
           options={{
-            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: getChartAnimationDuration(), easing: 'easeOutQuart' },
             scales: {
-              x: { beginAtZero: true, max: 100, ticks: { callback: (value) => `${value}%` } },
-              y: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 10 } } },
+              y: { beginAtZero: true, max: 100, ticks: { callback: (value) => `${value}%` } },
+              x: { grid: { display: false } },
             },
             plugins: {
-              legend: { display: false },
+              legend: {
+                position: 'bottom',
+                labels: { boxWidth: 12, padding: 12, font: { size: 10 } },
+              },
               tooltip: {
                 callbacks: {
-                  label: (context) => `${metricInfo.label}: ${Number(context.parsed.x).toFixed(2)}%`,
+                  label: (context) => `${context.dataset.label} · ${metricInfo.label}: ${Number(context.parsed.y).toFixed(2)}%`,
                 },
               },
             },
           }}
         />
       </div>
-    </div>
+      {unclassifiedFaculties.length > 0 && (
+        <p className="mt-3 rounded-lg border border-[#e0b83f] bg-[#fff9e8] px-3 py-2 text-[10px] leading-relaxed text-[#624800]">
+          Facultades sin área asignada, mostradas por separado: {unclassifiedFaculties.join(', ')}.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -309,6 +415,7 @@ export default function SchoolComparison({
       }),
     }))
     .filter((school) => school.missingPeriods.length > 0);
+  const showAreas = view === 'combined' || view === 'areas' || view === 'all';
   const showBars = view === 'combined' || view === 'bars' || view === 'all';
   const showFaculties = view === 'combined' || view === 'faculties' || view === 'all';
   const showHeatmap = view === 'heatmap' || view === 'all';
@@ -331,7 +438,8 @@ export default function SchoolComparison({
               onChange={(event) => setView(event.target.value as ViewMode)}
               className="dashboard-control mt-1 min-h-9 w-full rounded-lg border px-2.5 py-2 text-xs"
             >
-              <option value="combined">Tendencias por facultad y barras por escuela</option>
+              <option value="combined">Áreas, tendencias por facultad y escuelas</option>
+              <option value="areas">Comparación por áreas</option>
               <option value="bars">Barras comparativas por escuela</option>
               <option value="faculties">Paneles de tendencias por facultad</option>
               <option value="all">Vista completa: todos los gráficos</option>
@@ -357,7 +465,8 @@ export default function SchoolComparison({
         {view === 'bars' && 'Ordenadas de menor a mayor tasa para identificar rápidamente las escuelas que requieren atención. Cada barra identifica facultad y escuela.'}
         {view === 'faculties' && 'Cada panel muestra la evolución por periodo de las escuelas de una facultad; colores distintos identifican cada escuela dentro del panel.'}
         {view === 'heatmap' && 'Cada celda muestra la tasa de una escuela en un periodo. Verde indica un resultado favorable y rojo uno que requiere atención; el criterio depende del indicador.'}
-        {view === 'combined' && 'Se muestran primero las tendencias por facultad y después las barras comparativas por escuela.'}
+        {view === 'areas' && 'Compara la evolución del indicador entre Sociales, Ingenierías y Biomédicas para los filtros seleccionados.'}
+        {view === 'combined' && 'Se muestran primero las áreas, luego las tendencias por facultad y finalmente las barras comparativas por escuela.'}
       </p>
 
       {missingBySchool.length > 0 && (
@@ -381,15 +490,21 @@ export default function SchoolComparison({
       )}
 
       <div className="space-y-5">
+        {showAreas && (
+          <section>
+            {(view === 'combined' || view === 'all') && <h4 className="mb-2 text-xs font-bold text-slate-700">1. Comparación por áreas</h4>}
+            <AreaComparison schools={schools} periods={periods} metric={metric} grouping={grouping} />
+          </section>
+        )}
         {showFaculties && (
           <section>
-            {(view === 'combined' || view === 'all') && <h4 className="mb-2 text-xs font-bold text-slate-700">1. Tendencias por facultad</h4>}
+            {(view === 'combined' || view === 'all') && <h4 className="mb-2 text-xs font-bold text-slate-700">2. Tendencias por facultad</h4>}
             <FacultyPanels schools={schools} periods={periods} metric={metric} grouping={grouping} />
           </section>
         )}
         {showBars && (
           <section>
-            {(view === 'combined' || view === 'all') && <h4 className="mb-2 text-xs font-bold text-slate-700">2. Comparación de escuelas</h4>}
+            {(view === 'combined' || view === 'all') && <h4 className="mb-2 text-xs font-bold text-slate-700">3. Comparación de escuelas</h4>}
             <SchoolBars schools={schools} metric={metric} />
           </section>
         )}

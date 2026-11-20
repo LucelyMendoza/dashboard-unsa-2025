@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:import": "node --experimental-strip-types --test tests/import-utils.test.mjs",
+    "test:catalog": "node --experimental-strip-types --test tests/school-catalog.test.mjs",
     "data:build": "node scripts/generate-static-dataset.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && wrangler dev",

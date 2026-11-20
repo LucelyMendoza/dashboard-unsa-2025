@@ -75,6 +75,46 @@ export const FACULTADES: string[] = [
   'PSICOLOGÍA, RR.II. Y CS. DE LA COMUNICACIÓN',
 ];
 
+export type AcademicArea = 'Sociales' | 'Ingenierías' | 'Biomédicas';
+
+const AREA_BY_FACULTY_KEY: Record<string, AcademicArea> = {
+  ADMINISTRACION: 'Sociales',
+  AGRONOMIA: 'Biomédicas',
+  'ARQUITECTURA Y URBANISMO': 'Ingenierías',
+  'CIENCIAS BIOLOGICAS': 'Biomédicas',
+  'CIENCIAS CONTABLES Y FINANCIERAS': 'Sociales',
+  'CIENCIAS DE LA EDUCACION': 'Sociales',
+  'CIENCIAS HISTORICO SOCIALES': 'Sociales',
+  'CIENCIAS NATURALES Y FORMALES': 'Ingenierías',
+  DERECHO: 'Sociales',
+  ECONOMIA: 'Sociales',
+  ENFERMERIA: 'Biomédicas',
+  'FILOSOFIA Y HUMANIDADES': 'Sociales',
+  'GEOLOGIA GEOFISICA Y MINAS': 'Ingenierías',
+  'INGENIERIA CIVIL': 'Ingenierías',
+  'INGENIERIA DE PROCESOS': 'Ingenierías',
+  'INGENIERIA DE PRODUCCION Y SERVICIOS': 'Ingenierías',
+  'INGENIERIA GEOLOGICA GEOFISICA Y MINAS': 'Ingenierías',
+  MEDICINA: 'Biomédicas',
+  'PSICOLOGIA RELACIONES INDUSTRIALES Y CIENCIAS DE LA COMUNICACION': 'Sociales',
+  'PSICOLOGIA RR II Y CS DE LA COMUNICACION': 'Sociales',
+};
+
+export function normalizeFacultyKey(faculty: string): string {
+  return faculty
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00a0/g, ' ')
+    .toUpperCase()
+    .replace(/^FACULTAD\s+DE\s+/, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim();
+}
+
+export function areaDeFacultad(faculty: string): AcademicArea | null {
+  return AREA_BY_FACULTY_KEY[normalizeFacultyKey(faculty)] ?? null;
+}
+
 /** Resuelve la facultad de una escuela. Si no está en el catálogo, la marca
  * como '(SIN CLASIFICAR)' en vez de rechazar la fila — así la importación no
  * se detiene por una escuela nueva/mal escrita; queda visible para revisión. */

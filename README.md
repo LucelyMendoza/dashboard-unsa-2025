@@ -55,6 +55,11 @@ mayúsculas y acentos vocálicos, pero conserva la diferencia entre N y Ñ. Las 
 La migración local `0005_exact_row_deduplication.sql` elimina la llave antigua
 que confundía registros diferentes con el mismo periodo, escuela, código y grupo.
 
+La pestaña **Comparativas** muestra tendencias por áreas, facultades y escuelas.
+Las áreas se asignan por facultad en `src/lib/school-catalog.ts`; las tasas por
+área se ponderan con los matriculados y las facultades sin clasificación se
+identifican aparte en lugar de omitirse.
+
 ## Estructura
 
 - `src/lib/roles.ts` — cuentas y roles
