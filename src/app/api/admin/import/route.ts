@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { requireAdmin, AuthError } from '@/lib/auth-verify';
-import { getImportRowKey, groupImportRows, IMPORT_API_BATCH_SIZE } from '@/lib/import-utils';
+import { getImportRowKey, getImportRowLookupKey, groupImportRows, IMPORT_API_BATCH_SIZE } from '@/lib/import-utils';
 import type { ImportRow } from '@/lib/excelParser';
 
 interface ImportBody {
@@ -14,6 +14,7 @@ interface ImportBody {
 interface Summary {
   totalFilas: number;
   nuevos: number;
+  actualizados: number;
   duplicados: number;
   errores: { fila: number; motivo: string }[];
 }
@@ -30,11 +31,13 @@ type AppEnv = CloudflareEnv & {
 
 const D1_BATCH_SIZE = 50;
 
-async function findExistingKeys(db: D1Database, rows: ImportRow[]) {
-  const rowsByKey = new Map<string, ImportRow>();
-  for (const row of rows) rowsByKey.set(getImportRowKey(row), row);
-  const uniqueRows = Array.from(rowsByKey.values());
-  if (!uniqueRows.length) return new Set<string>();
+type StoredImportRow = Omit<ImportRow, '_fila'> & { id: number };
+
+async function findExistingRecords(db: D1Database, rows: ImportRow[]) {
+  const rowsByLookupKey = new Map<string, ImportRow>();
+  for (const row of rows) rowsByLookupKey.set(getImportRowLookupKey(row), row);
+  const uniqueRows = Array.from(rowsByLookupKey.values());
+  if (!uniqueRows.length) return new Map<string, number>();
 
   const keysJson = JSON.stringify(uniqueRows.map((row) => [
     row.periodo,
@@ -54,15 +57,24 @@ async function findExistingKeys(db: D1Database, rows: ImportRow[]) {
            json_extract(value, '$[4]') AS grupo
          FROM json_each(?)
        )
-       SELECT academic_records.periodo, academic_records.facultad, academic_records.escuela,
-              academic_records.codigo, academic_records.grupo
+       SELECT academic_records.id, academic_records.periodo, academic_records.anio,
+              academic_records.facultad, academic_records.escuela, academic_records.programa,
+              academic_records.codigo, academic_records.cod_asig AS codAsig,
+              academic_records.digito, academic_records.nro, academic_records.asignatura,
+              academic_records.grupo, academic_records.docente, academic_records.matriculados,
+              academic_records.aprobados, academic_records.desaprobados,
+              academic_records.abandonos, academic_records.retiros,
+              academic_records.aprob_11_13 AS aprob1113,
+              academic_records.aprob_14_16 AS aprob1416,
+              academic_records.aprob_17_20 AS aprob1720,
+              academic_records.anio_estudios AS anioEstudios, academic_records.promedio
        FROM academic_records
        INNER JOIN import_keys USING (periodo, facultad, escuela, codigo, grupo)`
     )
     .bind(keysJson)
-    .all<Pick<ImportRow, 'periodo' | 'facultad' | 'escuela' | 'codigo' | 'grupo'>>();
+    .all<StoredImportRow>();
 
-  return new Set((result.results ?? []).map(getImportRowKey));
+  return new Map((result.results ?? []).map((row) => [getImportRowKey(row), row.id]));
 }
 
 function getDuplicateGroups(rows: ImportRow[], existingKeys: Set<string>): DuplicateGroup[] {
@@ -70,7 +82,7 @@ function getDuplicateGroups(rows: ImportRow[], existingKeys: Set<string>): Dupli
     key,
     exists: existingKeys.has(key),
     rowNumbers: group.map((row) => row._fila),
-  })).filter((group) => group.exists || group.rowNumbers.length > 1);
+  })).filter((group) => group.exists);
 }
 
 export async function POST(request: Request) {
@@ -117,17 +129,18 @@ export async function POST(request: Request) {
     return Response.json({ error: 'La base de datos D1 (binding DB) no está configurada en este entorno.' }, { status: 500 });
   }
 
-  const existingKeys = await findExistingKeys(db, rows);
+  const existingRecords = await findExistingRecords(db, rows);
+  const existingKeys = new Set(existingRecords.keys());
   const groups = groupImportRows(rows);
   const duplicateGroups = getDuplicateGroups(rows, existingKeys);
-  const duplicateGroupKeys = new Set(duplicateGroups.map((group) => group.key));
   const duplicateSelections = body.duplicateSelections ?? {};
   const nuevas: ImportRow[] = [];
   let duplicateRows = 0;
 
   for (const [key, group] of groups) {
-    if (!duplicateGroupKeys.has(key)) {
+    if (!existingKeys.has(key)) {
       nuevas.push(group[0]);
+      duplicateRows += Math.max(0, group.length - 1);
       continue;
     }
 
@@ -152,7 +165,8 @@ export async function POST(request: Request) {
 
   const summary: Summary = {
     totalFilas: rows.length,
-    nuevos: nuevas.length,
+    nuevos: nuevas.filter((row) => !existingRecords.has(getImportRowKey(row))).length,
+    actualizados: nuevas.filter((row) => existingRecords.has(getImportRowKey(row))).length,
     duplicados: duplicateRows,
     errores: body.validationErrors ?? [],
   };
@@ -165,44 +179,59 @@ export async function POST(request: Request) {
     return Response.json({ summary, preview: nuevas.slice(0, 50), duplicateGroups: duplicatePreviews });
   }
 
-  // Inserta o reemplaza en lotes; cada grupo duplicado se procesa como una sola fila.
+  // Inserta filas nuevas y actualiza coincidencias exactas seleccionadas.
   const insertInto = (targetDb: D1Database) =>
     (async () => {
       for (let i = 0; i < nuevas.length; i += D1_BATCH_SIZE) {
         const chunk = nuevas.slice(i, i + D1_BATCH_SIZE);
-        const stmts = chunk.map((r) =>
-          targetDb
+        const stmts = chunk.map((r) => {
+          const existingId = existingRecords.get(getImportRowKey(r));
+          const values = [
+            r.periodo,
+            r.anio,
+            r.facultad,
+            r.escuela,
+            r.programa ?? '',
+            r.codigo,
+            r.codAsig ?? r.codigo,
+            r.digito ?? '',
+            r.nro ?? '',
+            r.asignatura,
+            r.grupo,
+            r.docente,
+            r.matriculados,
+            r.aprobados,
+            r.desaprobados,
+            r.abandonos,
+            r.retiros,
+            r.aprob1113,
+            r.aprob1416,
+            r.aprob1720,
+            r.anioEstudios,
+            r.promedio,
+            sourceFile ?? '',
+          ];
+          if (existingId !== undefined) {
+            return targetDb
+              .prepare(
+                `UPDATE academic_records
+                 SET periodo = ?, anio = ?, facultad = ?, escuela = ?, programa = ?, codigo = ?,
+                     cod_asig = ?, digito = ?, nro = ?, asignatura = ?, grupo = ?, docente = ?,
+                     matriculados = ?, aprobados = ?, desaprobados = ?, abandonos = ?, retiros = ?,
+                     aprob_11_13 = ?, aprob_14_16 = ?, aprob_17_20 = ?, anio_estudios = ?,
+                     promedio = ?, source_file = ?
+                 WHERE id = ?`
+              )
+              .bind(...values, existingId);
+          }
+          return targetDb
             .prepare(
-              `INSERT OR REPLACE INTO academic_records
+              `INSERT INTO academic_records
                (periodo, anio, facultad, escuela, programa, codigo, cod_asig, digito, nro, asignatura, grupo, docente, matriculados, aprobados, desaprobados, abandonos, retiros, aprob_11_13, aprob_14_16, aprob_17_20, anio_estudios, promedio, source_file)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
             )
-            .bind(
-              r.periodo,
-              r.anio,
-              r.facultad,
-              r.escuela,
-              r.programa ?? '',
-              r.codigo,
-              r.codAsig ?? r.codigo,
-              r.digito ?? '',
-              r.nro ?? '',
-              r.asignatura,
-              r.grupo,
-              r.docente,
-              r.matriculados,
-              r.aprobados,
-              r.desaprobados,
-              r.abandonos,
-              r.retiros,
-              r.aprob1113,
-              r.aprob1416,
-              r.aprob1720,
-              r.anioEstudios,
-              r.promedio,
-              sourceFile ?? ''
-            )
-        );
+            .bind(...values);
+        });
         await targetDb.batch(stmts);
       }
     })();

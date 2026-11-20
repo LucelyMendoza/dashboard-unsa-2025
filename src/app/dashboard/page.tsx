@@ -8,7 +8,7 @@ import { firebaseAuth } from '@/lib/firebase';
 import { getSession, clearSession, getRoleScope } from '@/lib/session';
 import { getAllowedTabs, canViewTab } from '@/lib/roles';
 import type { DashboardTab } from '@/types/dashboard';
-import { DEFAULT_FILTERS, FilterState, buildScorecard, filterAgg, groupBy } from '@/lib/data-utils';
+import { DEFAULT_FILTERS, FilterState, buildScorecard, filterAgg, groupBy, matchesSelection } from '@/lib/data-utils';
 import { recomputeDerived } from '@/lib/recompute';
 import { STATIC_DATASET_URL } from '@/lib/generated-dataset';
 import AdminUploadModal from '@/components/AdminUploadModal';
@@ -171,6 +171,32 @@ export default function DashboardPage() {
     () => buildScorecard(filteredAgg),
     [filteredAgg]
   );
+  const comparisonSchools = useMemo(() => {
+    if (!viewDataset) return [];
+    const schools = new Map<string, { faculty: string; school: string }>();
+    viewDataset.ag.forEach((row) => {
+      if (!matchesSelection(filters.facultad, row.FACULTAD)) return;
+      if (!matchesSelection(filters.escuela, row.ESCUELA)) return;
+      const key = JSON.stringify([row.FACULTAD, row.ESCUELA]);
+      if (!schools.has(key)) schools.set(key, { faculty: row.FACULTAD, school: row.ESCUELA });
+    });
+    return [...schools.values()];
+  }, [viewDataset, filters.facultad, filters.escuela]);
+  const comparisonPeriods = useMemo(() => {
+    if (!viewDataset) return [];
+    const selectedPeriods = viewDataset.ps
+      .filter((period) => filters.anio.length === 0 || filters.anio.includes(period.slice(0, 4)))
+      .filter(
+        (period) =>
+          filters.agrupacion === 'anio' ||
+          filters.periodo.length === 0 ||
+          filters.periodo.includes(period)
+      );
+    const periods = filters.agrupacion === 'anio'
+      ? [...new Set(selectedPeriods.map((period) => period.slice(0, 4)))]
+      : selectedPeriods;
+    return periods.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [viewDataset, filters.anio, filters.periodo, filters.agrupacion]);
   const chScope = filters.facultad.length === 0
     ? 'UNSA'
     : filters.facultad.length === 1
@@ -246,7 +272,12 @@ export default function DashboardPage() {
       {currentTabAllowed && tab === 'resumen' && (
         <div className="view-enter space-y-5">
           <KpiGrid groups={groups} />
-          <SchoolComparison rows={filteredAgg} grouping={filters.agrupacion} />
+          <SchoolComparison
+            rows={filteredAgg}
+            schools={comparisonSchools}
+            periods={comparisonPeriods}
+            grouping={filters.agrupacion}
+          />
 
           <div className="grid grid-cols-1 gap-4">
             <div className="dashboard-panel p-3 sm:p-4 w-full">

@@ -10,6 +10,9 @@ npx wrangler d1 migrations apply academic-db-produccion --local
 npm run dev
 ```
 
+Después de actualizar el proyecto, vuelve a ejecutar el comando de migraciones
+para aplicar los cambios pendientes a la D1 local.
+
 Abre `http://localhost:3000` → redirige a `/login`.
 El dashboard carga un dataset precomputado desde un archivo estático y no consulta
 D1 al abrirse. Para hacer una importación local, aplica las migraciones locales,
@@ -46,6 +49,11 @@ Para publicar los cambios después de importar un Excel:
 La aplicación de producción sirve el JSON estático desde Cloudflare y no lee ni
 escribe registros en D1. La URL del archivo incluye su hash; así, cada versión
 usa una ruta nueva y el navegador puede reutilizar la copia en caché.
+
+La importación compara todos los campos del registro; para `ASIGNATURA` ignora
+mayúsculas y acentos vocálicos, pero conserva la diferencia entre N y Ñ. Las filas repetidas exactamente dentro del Excel se agrupan.
+La migración local `0005_exact_row_deduplication.sql` elimina la llave antigua
+que confundía registros diferentes con el mismo periodo, escuela, código y grupo.
 
 ## Estructura
 

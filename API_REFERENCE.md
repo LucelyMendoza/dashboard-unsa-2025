@@ -38,6 +38,9 @@ migraciones locales antes de importar el Excel.
 `commit`. En desarrollo requiere un token de Firebase válido y un correo ADMIN.
 Una petición de producción no escribe en ninguna base y responde con estado 410.
 
-La clave para deduplicar filas es `PERIODO + FACULTAD + ESCUELA + CODIGO +
-GRUPOS`. Los registros ya importados localmente se pueden omitir o reemplazar
-desde la vista previa antes de regenerar el JSON.
+La deduplicación compara todos los campos académicos del registro, ignorando
+mayúsculas y acentos vocálicos únicamente en `ASIGNATURA` (N y Ñ siguen siendo distintas). Las filas idénticas repetidas
+dentro del archivo se agrupan. Los registros ya existentes se omiten o se
+actualizan si se activa esa opción en la vista previa.
+Antes de importar en una D1 local existente, aplica las migraciones pendientes
+con `npx wrangler d1 migrations apply academic-db-produccion --local`.

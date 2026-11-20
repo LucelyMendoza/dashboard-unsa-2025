@@ -10,6 +10,7 @@ import type { ImportRow } from '@/lib/excelParser';
 interface ImportSummary {
   totalFilas: number;
   nuevos: number;
+  actualizados?: number;
   duplicados: number;
   errores: ValidationError[];
 }
@@ -47,8 +48,6 @@ export default function AdminUploadModal() {
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [preview, setPreview] = useState<ImportRow[]>([]);
   const [allRows, setAllRows] = useState<ImportRow[]>([]);
-  const [duplicateGroups, setDuplicateGroups] = useState<PreviewResponse['duplicateGroups']>([]);
-  const [duplicateSelections, setDuplicateSelections] = useState<Record<string, number | ''>>({});
   const [existingKeys, setExistingKeys] = useState<string[]>([]);
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [sourceFile, setSourceFile] = useState('');
@@ -74,8 +73,6 @@ export default function AdminUploadModal() {
     setSummary(null);
     setPreview([]);
     setAllRows([]);
-    setDuplicateGroups([]);
-    setDuplicateSelections({});
     setExistingKeys([]);
     setReplaceExisting(false);
     setSourceFile('');
@@ -137,31 +134,21 @@ export default function AdminUploadModal() {
         if (remainingPreviewSlots > 0) serverPreviews.push(...response.preview.slice(0, remainingPreviewSlots));
       }
 
-      const duplicates = entries
-        .filter(([, group]) => group.length > 1)
-        .map(([key, group]) => ({
-          key,
-          exists: existingKeys.has(key),
-          rowNumbers: group.map((row) => row._fila),
-          rows: group,
-        }));
-      const duplicateKeys = new Set(duplicates.map((group) => group.key));
-      const newGroups = entries.filter(([key]) => !duplicateKeys.has(key) && !existingKeys.has(key)).length;
+      const newGroups = entries.filter(([key]) => !existingKeys.has(key)).length;
       const duplicateRows = entries.reduce(
-        (count, [key, group]) => count + (duplicateKeys.has(key) || existingKeys.has(key) ? group.length : 0),
+        (count, [key, group]) => count + (existingKeys.has(key) ? group.length : group.length - 1),
         0
       );
 
       setSummary({
         totalFilas: result.filasValidas.length,
         nuevos: newGroups,
+        actualizados: 0,
         duplicados: duplicateRows,
         errores: result.errores,
       });
-      setPreview(serverPreviews.filter((row) => !duplicateKeys.has(getImportRowKey(row))));
+      setPreview(serverPreviews);
       setAllRows(result.filasValidas);
-      setDuplicateGroups(duplicates);
-      setDuplicateSelections({});
       setExistingKeys(Array.from(existingKeys));
       setReplaceExisting(false);
       setProgress('');
@@ -184,32 +171,21 @@ export default function AdminUploadModal() {
       if (!token) throw new Error('No hay sesión activa. Por favor, vuelve a iniciar sesión.');
 
       const groups = groupImportRows(allRows);
-      const duplicateKeys = new Set(duplicateGroups.map((group) => group.key));
       const existingKeySet = new Set(existingKeys);
       const rowsToCommit: ImportRow[] = [];
       const selectionsToCommit: Record<string, number> = {};
 
       for (const [key, group] of groups) {
-        const isDuplicate = duplicateKeys.has(key) || existingKeySet.has(key);
-        if (!isDuplicate) {
+        const exists = existingKeySet.has(key);
+        if (!exists || replaceExisting) {
           rowsToCommit.push(group[0]);
-          continue;
+          if (exists) selectionsToCommit[key] = group[0]._fila;
         }
-
-        const selectedRowNumber = duplicateSelections[key];
-        const selectedRow =
-          typeof selectedRowNumber === 'number'
-            ? group.find((row) => row._fila === selectedRowNumber)
-            : replaceExisting && existingKeySet.has(key)
-              ? group[0]
-              : undefined;
-        if (!selectedRow) continue;
-        rowsToCommit.push(selectedRow);
-        if (existingKeySet.has(key)) selectionsToCommit[key] = selectedRow._fila;
       }
 
       const batches = splitIntoBatches(rowsToCommit, IMPORT_API_BATCH_SIZE);
       let savedRows = 0;
+      let updatedRows = 0;
       for (let i = 0; i < batches.length; i += 1) {
         token = await getIdToken();
         if (!token) {
@@ -251,9 +227,10 @@ export default function AdminUploadModal() {
 
         const result = (await commitRes.json()) as { summary: ImportSummary };
         savedRows += result.summary.nuevos;
+        updatedRows += result.summary.actualizados ?? 0;
       }
 
-      setSummary({ ...summary, nuevos: savedRows });
+      setSummary({ ...summary, nuevos: savedRows, actualizados: updatedRows });
       setProgress('');
       setStep('done');
     } catch (e) {
@@ -350,7 +327,7 @@ export default function AdminUploadModal() {
                       <p className="font-bold text-emerald-600">{summary.nuevos}</p>
                     </div>
                     <div>
-                      <p className="text-slate-500">Filas en grupos duplicados</p>
+                      <p className="text-slate-500">Filas repetidas o ya existentes</p>
                       <p className="font-bold text-orange-600">{summary.duplicados}</p>
                     </div>
                     <div>
@@ -384,48 +361,10 @@ export default function AdminUploadModal() {
                   </div>
                 )}
 
-                {duplicateGroups.length > 0 && (
-                  <div className="border border-orange-200 rounded-lg p-3 bg-orange-50 space-y-3">
-                    <div>
-                      <p className="text-xs font-semibold text-orange-900">Revisar grupos duplicados</p>
-                      <p className="text-[10px] text-orange-800">
-                        Elige una fila para conservar en cada grupo repetido dentro del archivo. Déjalo en «Omitir» para no importar ese grupo.
-                      </p>
-                    </div>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {duplicateGroups.map((group) => {
-                        const first = group.rows[0];
-                        return (
-                          <label key={group.key} className="block rounded-lg border border-orange-200 bg-white p-2">
-                            <span className="block text-[10px] font-semibold text-slate-800">
-                              {first.periodo} · {first.facultad} · {first.escuela} · {first.codigo} · Grupo {first.grupo || '—'}
-                            </span>
-                            <span className="block text-[10px] text-slate-500">
-                              {group.exists ? 'La clave se repite en el archivo y ya existe en la D1 local.' : 'La clave se repite en el archivo.'}
-                            </span>
-                            <select
-                              value={duplicateSelections[group.key] ?? ''}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setDuplicateSelections((current) => ({
-                                  ...current,
-                                  [group.key]: value ? Number(value) : '',
-                                }));
-                              }}
-                              className="mt-1.5 w-full rounded border border-slate-300 px-2 py-1 text-[10px]"
-                            >
-                              <option value="">Omitir este grupo</option>
-                              {group.rows.map((row) => (
-                                <option key={row._fila} value={row._fila}>
-                                  Fila {row._fila}: {row.codigo} · {row.asignatura} · aprobados {row.aprobados} · matriculados {row.matriculados}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
+                {summary.duplicados > 0 && (
+                  <p className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-[10px] leading-relaxed text-orange-900">
+                    Los duplicados se comparan usando todos los datos de la fila. En el nombre de la asignatura no se distinguen mayúsculas ni acentos vocálicos. Las filas idénticas repetidas dentro del archivo se agrupan y se importa una sola copia.
+                  </p>
                 )}
 
                 {existingKeys.length > 0 && (
@@ -441,7 +380,7 @@ export default function AdminUploadModal() {
                         className="mt-0.5"
                       />
                       <span>
-                        Reemplazar los registros existentes con los datos del archivo. Si hay varias filas del archivo para la misma clave, se usará la primera.
+                        Actualizar los registros existentes con una fila idéntica (ignorando acentos vocálicos y mayúsculas en la asignatura). Si el archivo repite esa fila, se usará la primera copia.
                       </span>
                     </label>
                   </div>
@@ -492,7 +431,7 @@ export default function AdminUploadModal() {
                   </button>
                   <button
                     onClick={handleConfirm}
-                    disabled={summary.nuevos === 0 && !replaceExisting && !Object.values(duplicateSelections).some((rowNumber) => typeof rowNumber === 'number')}
+                    disabled={summary.nuevos === 0 && !replaceExisting}
                     className="px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 rounded-md"
                   >
                     Confirmar importación
@@ -519,7 +458,7 @@ export default function AdminUploadModal() {
                   <div>
                     <p className="text-xs font-semibold text-emerald-900">Importación completada</p>
                     <p className="text-[10px] text-emerald-800 mt-1">
-                      Se guardaron {summary.nuevos} registros en D1 local. Ejecuta <code>npm run data:build</code> y publica el archivo actualizado en GitHub para reflejar los cambios en producción.
+                      Se agregaron {summary.nuevos} registros nuevos y se actualizaron {summary.actualizados ?? 0} registros en D1 local. Ejecuta <code>npm run data:build</code> y publica el archivo actualizado en GitHub para reflejar los cambios en producción.
                     </p>
                   </div>
                 </div>

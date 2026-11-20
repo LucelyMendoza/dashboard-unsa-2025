@@ -12,6 +12,7 @@ type Metric = 'apr' | 'des' | 'ret' | 'abn';
 type ViewMode = 'bars' | 'faculties' | 'heatmap' | 'all';
 type Counts = { m: number; apr: number; des: number; ret: number; abn: number };
 type SchoolData = { faculty: string; school: string; periods: Record<string, Counts> };
+type SchoolIdentity = { faculty: string; school: string };
 
 const METRICS: Record<Metric, { label: string; color: string; field: keyof Counts }> = {
   apr: { label: 'Aprobados', color: INDICATOR_CHART_COLORS.apr, field: 'apr' },
@@ -30,7 +31,7 @@ function getRate(counts: Counts | undefined, metric: Metric): number | null {
 function periodLabel(period: string, grouping: 'sem' | 'anio') {
   if (grouping === 'anio') return period;
   const [year, semester] = period.split('-');
-  return `${year} · S${semester}`;
+  return `${year} · Semestre ${semester}`;
 }
 
 function heatColor(value: number | null, metric: Metric) {
@@ -51,15 +52,22 @@ function heatColor(value: number | null, metric: Metric) {
   return { backgroundColor: '#f4b2ae', color: '#702321' };
 }
 
-function buildViewData(rows: AggregatedRow[], grouping: 'sem' | 'anio') {
-  const schools = new Map<string, SchoolData>();
-  const periods = new Set<string>();
+function buildViewData(
+  rows: AggregatedRow[],
+  schoolIdentities: SchoolIdentity[],
+  periods: string[],
+  grouping: 'sem' | 'anio'
+) {
+  const schools = new Map<string, SchoolData>(
+    schoolIdentities.map((identity) => [
+      JSON.stringify([identity.faculty, identity.school]),
+      { ...identity, periods: {} },
+    ])
+  );
 
   rows.forEach((row) => {
     const period = grouping === 'sem' ? row.PERIODO : String(row.AÑO);
     const schoolKey = JSON.stringify([row.FACULTAD, row.ESCUELA]);
-    periods.add(period);
-
     let school = schools.get(schoolKey);
     if (!school) {
       school = { faculty: row.FACULTAD, school: row.ESCUELA, periods: {} };
@@ -76,7 +84,7 @@ function buildViewData(rows: AggregatedRow[], grouping: 'sem' | 'anio') {
   });
 
   return {
-    periods: [...periods].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    periods,
     schools: [...schools.values()],
   };
 }
@@ -95,9 +103,9 @@ function SchoolBars({ schools, metric }: { schools: SchoolData[]; metric: Metric
         }),
         { m: 0, apr: 0, des: 0, ret: 0, abn: 0 }
       );
-      return { school, value: getRate(total, metric) ?? 0 };
+      return { school, value: getRate(total, metric) };
     })
-    .sort((a, b) => a.value - b.value || a.school.school.localeCompare(b.school.school));
+    .sort((a, b) => (a.value ?? -1) - (b.value ?? -1) || a.school.school.localeCompare(b.school.school));
 
   const height = Math.max(300, Math.min(780, rankedSchools.length * 28 + 80));
 
@@ -272,19 +280,35 @@ function SchoolHeatmap({
 
 export default function SchoolComparison({
   rows,
+  schools: schoolIdentities,
+  periods: selectedPeriods,
   grouping,
 }: {
   rows: AggregatedRow[];
+  schools: SchoolIdentity[];
+  periods: string[];
   grouping: 'sem' | 'anio';
 }) {
   const [view, setView] = useState<ViewMode>('bars');
   const [metric, setMetric] = useState<Metric>('apr');
-  const { periods, schools } = useMemo(() => buildViewData(rows, grouping), [rows, grouping]);
+  const { periods, schools } = useMemo(
+    () => buildViewData(rows, schoolIdentities, selectedPeriods, grouping),
+    [rows, schoolIdentities, selectedPeriods, grouping]
+  );
 
   if (schools.length === 0) {
     return <p className="py-8 text-center text-xs text-slate-500">Sin datos para comparar con los filtros seleccionados.</p>;
   }
 
+  const missingBySchool = schools
+    .map((school) => ({
+      ...school,
+      missingPeriods: periods.filter((period) => {
+        const counts = school.periods[period];
+        return !counts || counts.m === 0;
+      }),
+    }))
+    .filter((school) => school.missingPeriods.length > 0);
   const showBars = view === 'bars' || view === 'all';
   const showFaculties = view === 'faculties' || view === 'all';
   const showHeatmap = view === 'heatmap' || view === 'all';
@@ -335,6 +359,26 @@ export default function SchoolComparison({
         {view === 'heatmap' && 'Cada celda muestra la tasa de una escuela en un periodo. Verde indica un resultado favorable y rojo uno que requiere atención; el criterio depende del indicador.'}
         {view === 'all' && 'Se muestran en conjunto el ranking por escuela, las tendencias separadas por facultad y el mapa de calor por periodo.'}
       </p>
+
+      {missingBySchool.length > 0 && (
+        <aside
+          aria-label="Cobertura de datos por escuela"
+          className="mb-4 rounded-lg border border-[#e0b83f] bg-[#fff9e8] px-3 py-2.5 text-[10px] leading-relaxed text-[#624800]"
+        >
+          <p className="font-bold">
+            Hay {fmt(missingBySchool.reduce((total, school) => total + school.missingPeriods.length, 0))} combinaciones escuela-periodo sin matrícula registrada en los datos actuales.
+            Se muestran como «Sin datos», no como 0%.
+          </p>
+          <ul className="mt-1 list-inside list-disc">
+            {missingBySchool.slice(0, 6).map((school) => (
+              <li key={`${school.faculty}-${school.school}`}>
+                {school.faculty} · {school.school}: {school.missingPeriods.map((period) => periodLabel(period, grouping)).join(', ')}
+              </li>
+            ))}
+            {missingBySchool.length > 6 && <li>y {fmt(missingBySchool.length - 6)} escuelas más.</li>}
+          </ul>
+        </aside>
+      )}
 
       <div className="space-y-5">
         {showBars && (
